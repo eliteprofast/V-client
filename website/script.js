@@ -1,7 +1,7 @@
 "use strict";
 
-// Put VSMPClient.exe beside index.html, or change this URL to its hosted location.
-const DOWNLOAD_URL = "./VSMPClient.exe";
+// The complete Windows app bundle, including the files required beside the launcher.
+const DOWNLOAD_URL = "./AzyrClient.zip";
 // Replace this with your server's invite URL before publishing.
 const DISCORD_URL = "https://discord.gg/";
 
