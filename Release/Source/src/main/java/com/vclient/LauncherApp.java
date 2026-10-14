@@ -59,11 +59,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 public final class LauncherApp extends Application {
     private enum Page {
-        HOME, LIBRARY, BOOST, WARDROBE, FRIENDS, CONSOLE, SETTINGS, DISCORD
+        HOME, LIBRARY, MODS, BOOST, WARDROBE, FRIENDS, CONSOLE, SETTINGS, DISCORD
     }
 
     private record VersionChoice(String id, String label, String status,
@@ -87,6 +88,7 @@ public final class LauncherApp extends Application {
         return thread;
     });
     private final JavaRuntimeManager javaRuntimeManager = new JavaRuntimeManager();
+    private final ModrinthModService modrinthModService = new ModrinthModService();
     private MinecraftLauncher gameLauncher;
     private final MicrosoftAuthService authService = new MicrosoftAuthService();
     private final ElyByAuthService elyByAuthService = new ElyByAuthService();
@@ -99,6 +101,7 @@ public final class LauncherApp extends Application {
     private List<MinecraftLauncher.InstalledVersion> installedVersions = List.of();
     private MinecraftLauncher.VersionCatalog versionCatalog;
     private final java.util.Set<String> versionsDownloading = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Set<String> modsDownloading = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private String selectedVersionId = "";
     private LauncherSettings settings;
     private PlayerAccount account;
@@ -182,7 +185,7 @@ public final class LauncherApp extends Application {
             }
         });
         versionCard.getChildren().addAll(versionTitle, versionPicker);
-        HBox versionActions = new HBox(10);
+        javafx.scene.layout.FlowPane versionActions = new javafx.scene.layout.FlowPane(10, 10);
         versionActions.setAlignment(Pos.CENTER_LEFT);
         installVersionButton = button("INSTALL / REPAIR SELECTED VERSION", "#292642", 10);
         installVersionButton.setOnAction(event -> installSelectedVersion());
@@ -190,7 +193,25 @@ public final class LauncherApp extends Application {
         refreshVersionsButton.setOnAction(event -> refreshVersions(selectedVersionId));
         versionStatusLabel = label("Fetching the Mojang version catalog...", 11, MUTED);
         versionStatusLabel.setWrapText(true);
-        versionActions.getChildren().addAll(installVersionButton, refreshVersionsButton);
+        Button offlineToggle = button("", "#292642", 10);
+        Runnable updateOfflineToggle = () -> {
+            boolean offline = settings.offlineMode();
+            offlineToggle.setText(offline ? "OFFLINE MODE: ON" : "OFFLINE MODE: OFF");
+            offlineToggle.setStyle(offlineToggle.getStyle().replaceAll("-fx-background-color: [^;]+;",
+                    "-fx-background-color: " + (offline ? "#244a38" : "#292642") + ";"));
+            installVersionButton.setDisable(offline);
+        };
+        updateOfflineToggle.run();
+        offlineToggle.setOnAction(event -> {
+            settings.setOfflineMode(!settings.offlineMode());
+            saveSettings();
+            appendLog(settings.offlineMode()
+                    ? "Offline mode on: V-Client will not contact Mojang, Modrinth, skin servers, or download anything."
+                    : "Offline mode off: V-Client can download versions, libraries, assets, and Java again.");
+            updateOfflineToggle.run();
+            refreshVersions(selectedVersionId);
+        });
+        versionActions.getChildren().addAll(installVersionButton, refreshVersionsButton, offlineToggle);
         versionCard.getChildren().addAll(versionActions, versionStatusLabel);
         HBox connectionRow = new HBox(12);
         connectionRow.setAlignment(Pos.CENTER_LEFT);
@@ -690,6 +711,330 @@ public final class LauncherApp extends Application {
         }
     }
 
+    private void showMods() {
+        activePage = Page.MODS;
+        settingsPage = false;
+        updateNavigationState();
+        StackPane root = baseLayout();
+        VBox content = pageContent("Modrinth", "Mods",
+                "Browse Modrinth and install mods straight into your mods folder. The folder is created automatically on your first install.");
+        Path modsDirectory = settings.minecraftDirectory().resolve("mods").toAbsolutePath().normalize();
+        AtomicInteger searchGeneration = new AtomicInteger();
+
+        VBox browseCard = card();
+        Label profileTitle = label("MOD-LOADER PROFILE", 11, MUTED);
+        ComboBox<MinecraftLauncher.InstalledVersion> profilePicker = new ComboBox<>();
+        profilePicker.setMaxWidth(Double.MAX_VALUE);
+        profilePicker.setPrefHeight(44);
+        profilePicker.setStyle("-fx-background-color: rgba(20, 20, 45, 0.92); -fx-text-fill: #f3f0ff; -fx-font-size: 14px; -fx-border-color: #48415f; -fx-border-radius: 8; -fx-background-radius: 8;");
+        profilePicker.setPromptText("Scanning installed Fabric, Forge, NeoForge, and Quilt profiles...");
+        HBox searchRow = new HBox(10);
+        searchRow.setAlignment(Pos.CENTER_LEFT);
+        TextField query = new TextField();
+        query.setPromptText("Search Modrinth mods (leave empty for most popular)");
+        query.setStyle(fieldStyle());
+        HBox.setHgrow(query, Priority.ALWAYS);
+        Button search = button("SEARCH", ACCENT, 11);
+        searchRow.getChildren().addAll(query, search);
+        Label browseStatus = label("Select a mod-loader profile to browse compatible mods.", 11, MUTED);
+        browseStatus.setWrapText(true);
+
+        ListView<Path> installedList = new ListView<>();
+        Label installedStatus = label("", 11, MUTED);
+        installedStatus.setWrapText(true);
+        Runnable refreshInstalled = () -> loadInstalledMods(modsDirectory, installedList, installedStatus);
+
+        ListView<ModrinthModService.ModProject> results = new ListView<>();
+        results.setPlaceholder(label("No mods to show yet.", 13, MUTED));
+        results.setStyle("-fx-control-inner-background: rgba(9, 10, 28, 0.82); -fx-background-color: transparent; -fx-border-color: rgba(170, 151, 207, 0.24);");
+        results.setPrefHeight(340);
+        results.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(ModrinthModService.ModProject project, boolean empty) {
+                super.updateItem(project, empty);
+                if (empty || project == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+                ImageView icon = new ImageView();
+                icon.setFitWidth(42);
+                icon.setFitHeight(42);
+                icon.setPreserveRatio(true);
+                Image iconImage = modIcon(project.iconUrl());
+                if (iconImage != null) icon.setImage(iconImage);
+                StackPane iconBox = new StackPane(icon);
+                iconBox.setMinSize(46, 46);
+                iconBox.setMaxSize(46, 46);
+                iconBox.setStyle("-fx-background-color: rgba(41, 38, 66, 0.9); -fx-background-radius: 8;");
+                Label name = label(project.title(), 14, "#f3f6fc");
+                name.setStyle(name.getStyle() + "-fx-font-weight: bold;");
+                Label description = label(project.description(), 11, MUTED);
+                description.setWrapText(true);
+                Label details = label(formatDownloads(project.downloads()) + " downloads  ·  "
+                        + project.versionNumber() + "  ·  " + project.fileName(), 10, "#7f7fa6");
+                details.setWrapText(true);
+                VBox text = new VBox(4, name, description, details);
+                text.setMinWidth(0);
+                HBox.setHgrow(text, Priority.ALWAYS);
+                boolean installed = Files.isRegularFile(modsDirectory.resolve(project.fileName()));
+                boolean downloading = modsDownloading.contains(project.fileName());
+                Button install = button(installed ? "INSTALLED" : downloading ? "INSTALLING..." : "INSTALL",
+                        installed ? "#244a38" : ACCENT, 10);
+                install.setMinWidth(Region.USE_PREF_SIZE);
+                install.setDisable(installed || downloading);
+                install.setOnAction(event -> installMod(project, modsDirectory, results, browseStatus, refreshInstalled));
+                HBox row = new HBox(14, iconBox, text, install);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.setPadding(new Insets(8, 4, 8, 4));
+                row.setMaxWidth(Double.MAX_VALUE);
+                setText(null);
+                setGraphic(row);
+                setPrefWidth(0);
+            }
+        });
+
+        Runnable runSearch = () -> {
+            if (settings.offlineMode()) {
+                browseStatus.setText("Offline mode is on, so Modrinth is not contacted. Turn it off on Home to browse and install mods.");
+                return;
+            }
+            MinecraftLauncher.InstalledVersion profile = profilePicker.getValue();
+            if (profile == null) {
+                browseStatus.setText("Install a Fabric, Forge, NeoForge, or Quilt profile first, then pick it above.");
+                return;
+            }
+            searchMods(profile, query.getText() == null ? "" : query.getText(), results, browseStatus,
+                    search, searchGeneration);
+        };
+        search.setOnAction(event -> runSearch.run());
+        query.setOnAction(event -> runSearch.run());
+        profilePicker.valueProperty().addListener((observable, oldProfile, newProfile) -> {
+            results.getItems().clear();
+            if (newProfile != null) runSearch.run();
+        });
+        browseCard.getChildren().addAll(profileTitle, profilePicker, searchRow, browseStatus, results);
+
+        VBox installedCard = card();
+        HBox installedHeading = new HBox(10);
+        installedHeading.setAlignment(Pos.CENTER_LEFT);
+        Label installedTitle = label("INSTALLED MODS", 11, MUTED);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Button refresh = button("REFRESH", "#292642", 10);
+        refresh.setOnAction(event -> refreshInstalled.run());
+        Button openFolder = button("OPEN MODS FOLDER", "#292642", 10);
+        openFolder.setOnAction(event -> {
+            try {
+                Files.createDirectories(modsDirectory);
+                if (!Desktop.isDesktopSupported()) throw new IOException("This computer does not support opening folders from V-Client.");
+                Desktop.getDesktop().open(modsDirectory.toFile());
+            } catch (IOException | UnsupportedOperationException e) {
+                showError("Could not open the mods folder", e);
+            }
+        });
+        installedHeading.getChildren().addAll(installedTitle, spacer, refresh, openFolder);
+        installedList.setPlaceholder(label("No mods installed yet.", 13, MUTED));
+        installedList.setStyle("-fx-control-inner-background: rgba(9, 10, 28, 0.82); -fx-background-color: transparent; -fx-border-color: rgba(170, 151, 207, 0.24);");
+        installedList.setPrefHeight(200);
+        installedList.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(Path file, boolean empty) {
+                super.updateItem(file, empty);
+                if (empty || file == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+                String fileName = file.getFileName().toString();
+                boolean disabled = fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".disabled");
+                Label name = label(fileName, 13, disabled ? MUTED : "#f3f6fc");
+                Label details = label(disabled ? "Disabled" : "Enabled", 10, disabled ? "#7f7fa6" : "#39d98a");
+                VBox item = new VBox(3, name, details);
+                item.setPadding(new Insets(6, 2, 6, 2));
+                setText(null);
+                setGraphic(item);
+            }
+        });
+        Button remove = button("REMOVE SELECTED MOD", "#482332", 10);
+        remove.setOnAction(event -> removeSelectedMod(modsDirectory, installedList, refreshInstalled));
+        installedCard.getChildren().addAll(installedHeading,
+                label(modsDirectory.toString(), 10, MUTED), installedList, remove, installedStatus);
+
+        content.getChildren().addAll(browseCard, installedCard);
+        setPageContent(root, content);
+        stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+        refreshInstalled.run();
+
+        executor.execute(() -> {
+            try {
+                List<MinecraftLauncher.InstalledVersion> found = gameLauncher.findVersions(settings.minecraftDirectory());
+                List<MinecraftLauncher.InstalledVersion> loaderProfiles = found.stream()
+                        .filter(version -> !"Vanilla".equals(version.loader())).toList();
+                Platform.runLater(() -> {
+                    installedVersions = found;
+                    if (activePage != Page.MODS) return;
+                    profilePicker.getItems().setAll(loaderProfiles);
+                    if (loaderProfiles.isEmpty()) {
+                        profilePicker.setPromptText("No mod-loader profiles installed");
+                        browseStatus.setText("Mods need a Fabric, Forge, NeoForge, or Quilt profile. Install one in V-Client's game folder, then come back.");
+                        return;
+                    }
+                    profilePicker.setValue(loaderProfiles.stream()
+                            .filter(version -> version.id().equals(selectedVersionId))
+                            .findFirst().orElse(loaderProfiles.getFirst()));
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> browseStatus.setText("Could not scan profiles: " + e.getMessage()));
+            }
+        });
+    }
+
+    private void searchMods(MinecraftLauncher.InstalledVersion profile, String query,
+                            ListView<ModrinthModService.ModProject> results, Label browseStatus,
+                            Button search, AtomicInteger searchGeneration) {
+        int generation = searchGeneration.incrementAndGet();
+        search.setDisable(true);
+        results.getItems().clear();
+        browseStatus.setText("Searching Modrinth...");
+        Path minecraftDirectory = settings.minecraftDirectory();
+        executor.execute(() -> {
+            try {
+                ModrinthModService.Target target = ModrinthModService.resolveTarget(minecraftDirectory, profile);
+                List<ModrinthModService.ModProject> found = modrinthModService.search(query, target, message ->
+                        Platform.runLater(() -> {
+                            if (searchGeneration.get() == generation) browseStatus.setText(message);
+                        }));
+                Platform.runLater(() -> {
+                    if (searchGeneration.get() != generation) return;
+                    results.getItems().setAll(found);
+                    browseStatus.setText(found.isEmpty()
+                            ? "No compatible " + target.loader() + " mods found for Minecraft " + target.gameVersion() + "."
+                            : found.size() + " compatible mods for " + target.loader() + " · Minecraft " + target.gameVersion() + ".");
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    if (searchGeneration.get() != generation) return;
+                    browseStatus.setText("Mod search failed: " + e.getMessage());
+                    appendLog("Modrinth search failed: " + e.getMessage());
+                });
+            } finally {
+                Platform.runLater(() -> {
+                    if (searchGeneration.get() == generation) search.setDisable(false);
+                });
+            }
+        });
+    }
+
+    private void installMod(ModrinthModService.ModProject project, Path modsDirectory,
+                            ListView<ModrinthModService.ModProject> results, Label browseStatus,
+                            Runnable refreshInstalled) {
+        if (settings.offlineMode()) {
+            browseStatus.setText("Offline mode is on. Turn it off on Home to install mods.");
+            return;
+        }
+        if (!modsDownloading.add(project.fileName())) return;
+        results.refresh();
+        browseStatus.setText("Installing " + project.title() + "...");
+        appendLog("Installing mod " + project.title() + " (" + project.fileName() + ") into " + modsDirectory + ".");
+        Path minecraftDirectory = modsDirectory.getParent();
+        executor.execute(() -> {
+            try {
+                Path installed = modrinthModService.install(project, minecraftDirectory, message ->
+                        Platform.runLater(() -> {
+                            browseStatus.setText(message);
+                            appendLog(message);
+                        }));
+                Platform.runLater(() -> {
+                    browseStatus.setText(project.title() + " installed to " + installed + ".");
+                    appendLog("Installed mod " + installed + ".");
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    browseStatus.setText("Could not install " + project.title() + ": " + e.getMessage());
+                    appendLog("Mod install failed for " + project.title() + ": " + e.getMessage());
+                    showError("Could not install " + project.title(), e);
+                });
+            } finally {
+                modsDownloading.remove(project.fileName());
+                Platform.runLater(() -> {
+                    results.refresh();
+                    refreshInstalled.run();
+                });
+            }
+        });
+    }
+
+    private void loadInstalledMods(Path modsDirectory, ListView<Path> installedList, Label installedStatus) {
+        installedStatus.setText("Scanning mods folder...");
+        executor.execute(() -> {
+            List<Path> mods = new ArrayList<>();
+            String error = null;
+            if (Files.isDirectory(modsDirectory)) {
+                try (var files = Files.list(modsDirectory)) {
+                    files.filter(Files::isRegularFile)
+                            .filter(file -> {
+                                String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+                                return name.endsWith(".jar") || name.endsWith(".jar.disabled");
+                            })
+                            .sorted(java.util.Comparator.comparing(file -> file.getFileName().toString().toLowerCase(java.util.Locale.ROOT)))
+                            .forEach(mods::add);
+                } catch (IOException e) {
+                    error = e.getMessage();
+                }
+            }
+            String scanError = error;
+            Platform.runLater(() -> {
+                installedList.getItems().setAll(mods);
+                if (scanError != null) installedStatus.setText("Could not read the mods folder: " + scanError);
+                else if (!Files.isDirectory(modsDirectory)) installedStatus.setText("No mods folder yet. It will be created on your first install.");
+                else installedStatus.setText(mods.size() + (mods.size() == 1 ? " mod installed." : " mods installed."));
+            });
+        });
+    }
+
+    private void removeSelectedMod(Path modsDirectory, ListView<Path> installedList, Runnable refreshInstalled) {
+        Path selected = installedList.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showError("Select a mod", new IOException("Choose an installed mod to remove."));
+            return;
+        }
+        Path file = selected.toAbsolutePath().normalize();
+        if (!modsDirectory.equals(file.getParent())) {
+            showError("Could not remove mod", new IOException("That file is not inside V-Client's mods folder."));
+            return;
+        }
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Remove " + file.getFileName() + " from your mods folder?", ButtonType.OK, ButtonType.CANCEL);
+        confirm.initOwner(stage);
+        confirm.setTitle("V-Client");
+        confirm.setHeaderText("Remove mod");
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+        try {
+            Files.deleteIfExists(file);
+            appendLog("Removed mod " + file + ".");
+        } catch (IOException e) {
+            showError("Could not remove mod", e);
+        }
+        refreshInstalled.run();
+    }
+
+    private static Image modIcon(String iconUrl) {
+        try {
+            URI uri = URI.create(iconUrl);
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || !"cdn.modrinth.com".equalsIgnoreCase(uri.getHost())) return null;
+            return new Image(uri.toString(), 42, 42, true, true, true);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static String formatDownloads(long downloads) {
+        if (downloads >= 1_000_000) return String.format(java.util.Locale.ROOT, "%.1fM", downloads / 1_000_000.0);
+        if (downloads >= 1_000) return String.format(java.util.Locale.ROOT, "%.1fK", downloads / 1_000.0);
+        return Long.toString(downloads);
+    }
+
     private void showLogin() {
         activePage = Page.SETTINGS;
         settingsPage = true;
@@ -828,7 +1173,7 @@ public final class LauncherApp extends Application {
                 dot(account == null ? "#64728a" : "#39d98a"), headerAccountLabel, switchAccount);
         header.setStyle("-fx-background-color: rgba(9, 10, 27, 0.78); -fx-border-color: transparent transparent rgba(145, 127, 186, 0.22) transparent;");
         layout.setTop(header);
-        VBox navigation = new VBox(5);
+        VBox navigation = new VBox(3);
         navigation.setAlignment(Pos.TOP_CENTER);
         navigation.setPadding(new Insets(10, 5, 10, 5));
         navigation.setPrefWidth(88);
@@ -837,8 +1182,8 @@ public final class LauncherApp extends Application {
             Button item = button(navigationText(page), "transparent", 10);
             item.setMinWidth(76);
             item.setPrefWidth(76);
-            item.setMinHeight(56);
-            item.setMaxHeight(56);
+            item.setMinHeight(52);
+            item.setMaxHeight(52);
             item.setWrapText(true);
             item.setOnAction(event -> navigate(page));
             navigationButtons.put(page, item);
@@ -854,6 +1199,7 @@ public final class LauncherApp extends Application {
         switch (page) {
             case HOME -> showHome();
             case LIBRARY -> showLibrary();
+            case MODS -> showMods();
             case BOOST -> showBoost();
             case WARDROBE -> showWardrobe();
             case FRIENDS -> showFriends();
@@ -869,7 +1215,7 @@ public final class LauncherApp extends Application {
             item.setStyle("-fx-background-color: " + (selected ? "rgba(230, 189, 89, 0.20)" : "transparent")
                     + "; -fx-text-fill: " + (selected ? ACCENT : MUTED)
                     + "; -fx-font-size: 10px; -fx-font-weight: bold; -fx-background-radius: 12;"
-                    + " -fx-padding: 7 2 7 2; -fx-cursor: hand;");
+                    + " -fx-padding: 5 2 5 2; -fx-cursor: hand;");
         });
     }
 
@@ -877,6 +1223,7 @@ public final class LauncherApp extends Application {
         return switch (page) {
             case HOME -> "⌂\nHome";
             case LIBRARY -> "▤\nLibrary";
+            case MODS -> "✚\nMods";
             case BOOST -> "ϟ\nBoost";
             case WARDROBE -> "♧\nWardrobe";
             case FRIENDS -> "♟\nFriends";
@@ -903,11 +1250,28 @@ public final class LauncherApp extends Application {
         if (versionPicker == null) return;
         versionPicker.setDisable(true);
         if (refreshVersionsButton != null) refreshVersionsButton.setDisable(true);
-        versionPicker.setPromptText("Fetching Mojang versions...");
+        boolean offline = settings.offlineMode();
+        versionPicker.setPromptText(offline ? "Scanning installed versions..." : "Fetching Mojang versions...");
         Path directory = settings.minecraftDirectory();
         executor.execute(() -> {
+            List<MinecraftLauncher.InstalledVersion> versions;
             try {
-                List<MinecraftLauncher.InstalledVersion> versions = gameLauncher.findVersions(directory);
+                versions = gameLauncher.findVersions(directory);
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    if (refreshVersionsButton != null) refreshVersionsButton.setDisable(false);
+                    if (versionPicker != null) versionPicker.setDisable(false);
+                    versionStatusLabel.setText("Could not scan installed versions: " + e.getMessage());
+                    showError("Could not scan installed Minecraft versions", e);
+                });
+                return;
+            }
+            if (offline) {
+                Platform.runLater(() -> showInstalledVersionsOnly(versions, selectId, directory,
+                        "Offline mode · nothing is contacted"));
+                return;
+            }
+            try {
                 MinecraftLauncher.VersionCatalog catalog = gameLauncher.fetchVersionCatalog(
                         line -> Platform.runLater(() -> appendLog(line)));
                 Platform.runLater(() -> {
@@ -932,13 +1296,39 @@ public final class LauncherApp extends Application {
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    if (refreshVersionsButton != null) refreshVersionsButton.setDisable(false);
-                    if (versionPicker != null) versionPicker.setDisable(false);
-                    versionStatusLabel.setText("Could not refresh Mojang versions: " + e.getMessage());
-                    showError("Could not refresh Minecraft versions", e);
+                    appendLog("Mojang version list unavailable (" + e.getMessage()
+                            + "); showing installed versions only.");
+                    showInstalledVersionsOnly(versions, selectId, directory,
+                            "Mojang unreachable · showing installed versions · turn on Offline mode to stop connecting");
                 });
             }
         });
+    }
+
+    private void showInstalledVersionsOnly(List<MinecraftLauncher.InstalledVersion> versions, String selectId,
+                                           Path directory, String reason) {
+        installedVersions = versions;
+        versionCatalog = null;
+        if (settingsPage || versionPicker == null) return;
+        if (refreshVersionsButton != null) refreshVersionsButton.setDisable(false);
+        List<VersionChoice> choices = versions.stream()
+                .map(profile -> new VersionChoice(profile.id(), profile.displayName(), "Installed",
+                        null, profile, true))
+                .toList();
+        versionPicker.getItems().setAll(choices);
+        versionPicker.setDisable(false);
+        versionPicker.setPromptText(choices.isEmpty() ? "No installed versions found" : "Choose an installed version");
+        MinecraftLauncher.InstalledVersion preferred = MinecraftLauncher.preferredInstalledVersion(versions);
+        VersionChoice chosen = choices.stream().filter(choice -> choice.id().equals(selectId)).findFirst()
+                .orElseGet(() -> choices.stream()
+                        .filter(choice -> preferred != null && choice.id().equals(preferred.id()))
+                        .findFirst().orElse(choices.isEmpty() ? null : choices.getFirst()));
+        if (chosen != null) {
+            versionPicker.getSelectionModel().select(chosen);
+            selectedVersionId = chosen.id();
+        }
+        versionStatusLabel.setText(reason + " · Installed profiles: " + versions.size()
+                + " · Game folder: " + directory);
     }
 
     private List<VersionChoice> buildVersionChoices(MinecraftLauncher.VersionCatalog catalog,
@@ -1073,6 +1463,10 @@ public final class LauncherApp extends Application {
     }
 
     private void runConnectionTest() {
+        if (settings.offlineMode()) {
+            connectionResultLabel.setText("Offline mode is on, so nothing is contacted. Turn it off to run the connection test.");
+            return;
+        }
         connectionTestButton.setDisable(true);
         connectionTestButton.setText("TESTING...");
         connectionResultLabel.setText("Checking internet, DNS, TLS, and Mojang...");
@@ -1116,13 +1510,16 @@ public final class LauncherApp extends Application {
         if (choice == null || choice.installed() == null) {
             if (versionStatusLabel != null) {
                 versionStatusLabel.setText(choice == null
-                        ? "Refresh the Mojang version catalog before playing."
+                        ? (versionCatalog == null
+                        ? "No installed versions found. Turn off Offline mode once to download one, or import game files in Settings."
+                        : "Refresh the Mojang version catalog before playing.")
                         : choice.id() + " is downloading. Wait for installation to finish.");
             }
             return;
         }
         MinecraftLauncher.InstalledVersion selected = choice.installed();
         PlayerAccount selectedAccount = account;
+        boolean offline = settings.offlineMode();
         Button launchingButton = joinSmp ? singleplayerButton : playButton;
         playButton.setDisable(true);
         playButton.setText(joinSmp ? "▶    PLAY" : "STARTING...");
@@ -1138,7 +1535,15 @@ public final class LauncherApp extends Application {
             try {
                 Consumer<String> output = line -> Platform.runLater(() -> appendLog(line));
                 MinecraftLauncher.InstalledVersion launchVersion = selected;
-                if (!joinSmp) {
+                if (offline) {
+                    if (!joinSmp) {
+                        gameLauncher.launchSingleplayerLocal(settings.minecraftDirectory(), launchVersion,
+                                settings.memoryGb(), selectedAccount, output);
+                    } else {
+                        gameLauncher.launchToServerLocally(settings.minecraftDirectory(), launchVersion,
+                                settings.memoryGb(), selectedAccount, "neuron.zeroxhost.space", 19145, output);
+                    }
+                } else if (!joinSmp) {
                     gameLauncher.launchSingleplayer(settings.minecraftDirectory(), launchVersion,
                             settings.memoryGb(), selectedAccount, output);
                 } else {
@@ -1646,8 +2051,8 @@ public final class LauncherApp extends Application {
         });
     }
 
-    private static Image downloadImage(String address) {
-        if (address == null || address.isBlank()) return null;
+    private Image downloadImage(String address) {
+        if (address == null || address.isBlank() || settings.offlineMode()) return null;
         try {
             URI uri = URI.create(address);
             if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) return null;

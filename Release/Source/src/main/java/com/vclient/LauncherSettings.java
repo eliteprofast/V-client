@@ -18,14 +18,16 @@ final class LauncherSettings {
     private int javaMajorOverride;
     private String lastAccountId;
     private String discordInvite;
+    private boolean offlineMode;
 
     private LauncherSettings(Path minecraftDirectory, int memoryGb, int javaMajorOverride,
-                             String lastAccountId, String discordInvite) {
+                             String lastAccountId, String discordInvite, boolean offlineMode) {
         this.minecraftDirectory = minecraftDirectory;
         this.memoryGb = memoryGb;
         this.javaMajorOverride = javaMajorOverride;
         this.lastAccountId = lastAccountId;
         this.discordInvite = discordInvite;
+        this.offlineMode = offlineMode;
     }
 
     static LauncherSettings load() throws IOException {
@@ -33,7 +35,7 @@ final class LauncherSettings {
                 Path.of(System.getProperty("user.home"), "AppData", "Roaming").toString()));
         Path defaultDirectory = privateMinecraftDirectory(appData);
         if (!Files.exists(SETTINGS_FILE)) {
-            return new LauncherSettings(defaultDirectory, defaultMemory(), 0, "", "");
+            return new LauncherSettings(defaultDirectory, defaultMemory(), 0, "", "", true);
         }
         ObjectNode saved = (ObjectNode) JSON.readTree(SETTINGS_FILE.toFile());
         String directory = saved.path("minecraftDirectory").asText(defaultDirectory.toString());
@@ -44,7 +46,8 @@ final class LauncherSettings {
         LauncherSettings settings = new LauncherSettings(minecraftDirectory,
                 Math.clamp(memory, 1, maxMemory()), saved.path("javaMajorOverride").asInt(0) == 25 ? 25 : 0,
                 saved.path("lastAccountId").asText(""),
-                saved.path("discordInvite").asText(""));
+                saved.path("discordInvite").asText(""),
+                saved.path("offlineMode").asBoolean(true));
         if (!minecraftDirectory.equals(selectedDirectory)) settings.save();
         return settings;
     }
@@ -84,6 +87,7 @@ final class LauncherSettings {
         saved.put("javaMajorOverride", javaMajorOverride);
         saved.put("lastAccountId", lastAccountId);
         saved.put("discordInvite", discordInvite);
+        saved.put("offlineMode", offlineMode);
         JSON.writerWithDefaultPrettyPrinter().writeValue(SETTINGS_FILE.toFile(), saved);
     }
 
@@ -128,6 +132,14 @@ final class LauncherSettings {
 
     void setDiscordInvite(String discordInvite) {
         this.discordInvite = discordInvite;
+    }
+
+    boolean offlineMode() {
+        return offlineMode;
+    }
+
+    void setOfflineMode(boolean offlineMode) {
+        this.offlineMode = offlineMode;
     }
 
     static int maxMemory() {

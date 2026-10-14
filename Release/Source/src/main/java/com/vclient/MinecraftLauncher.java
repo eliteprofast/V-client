@@ -999,6 +999,10 @@ final class MinecraftLauncher {
     private static String detectLoader(String id, JsonNode metadata) {
         String lowerId = id.toLowerCase(Locale.ROOT);
         if (lowerId.contains("fabric") || hasLibrary(metadata, "net.fabricmc:fabric-loader")) return "Fabric";
+        if (lowerId.contains("neoforge") || hasLibrary(metadata, "net.neoforged:neoforge")) {
+            return "NeoForge";
+        }
+        if (lowerId.contains("quilt") || hasLibrary(metadata, "org.quiltmc:quilt-loader")) return "Quilt";
         if (lowerId.contains("forge") || hasLibrary(metadata, "net.minecraftforge:forge")
                 || hasLibrary(metadata, "net.minecraftforge:fml")) return "Forge";
         return "Vanilla";
