@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b16">
+  <meta name="description" content="Meet VSMP Client: a focused Minecraft launcher with version management, Fabric support, and a private game folder.">
+  <title>VSMP Client — Your game, your way</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./script.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#home" aria-label="VSMP Client home">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M9 9h30v30H9z" fill="#e7bf68"/>
+        <path d="M15 16h6l3 10 3-10h6l-6.2 17h-5.6z" fill="#101321"/>
+        <path d="M34 8h6v6h-6z" fill="#fff0bd"/>
+      </svg>
+      <span>VSMP<span class="brand-light"> CLIENT</span></span>
+    </a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
+      <span class="sr-only">Toggle navigation</span>
+      <span></span><span></span><span></span>
+    </button>
+    <nav class="site-nav" id="site-nav" aria-label="Main navigation">
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="#changelog">Changelog</a>
+      <a class="nav-discord discord-link" href="https://discord.gg/" target="_blank" rel="noopener noreferrer">Discord ↗</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero section-wrap" id="home">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> BUILT FOR YOUR NEXT ADVENTURE</p>
+        <h1>Your Minecraft.<br><span>Your way.</span></h1>
+        <p class="hero-description">A clean, lightweight launcher that keeps your versions, settings, and game files together in one place.</p>
+        <div class="hero-actions">
+          <a class="button button-primary download-link" href="./VSMPClient.exe" download>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m0 0 4-4m-4 4L6 8M3 14v3h14v-3" /></svg>
+            Download for Windows
+          </a>
+          <a class="button button-secondary" href="#features">Explore features <span aria-hidden="true">↓</span></a>
+        </div>
+        <p class="download-note">Windows desktop app · Direct download · No account required to browse</p>
+      </div>
+      <div class="hero-art" aria-label="Illustration of the VSMP Client launcher">
+        <div class="orbit orbit-one"></div>
+        <div class="orbit orbit-two"></div>
+        <div class="hero-cube cube-back"><i></i></div>
+        <div class="hero-cube cube-front"><i></i></div>
+        <div class="hero-window">
+          <div class="window-top"><span></span><span></span><span></span><b>VSMP CLIENT</b></div>
+          <div class="window-body">
+            <div class="window-side"><b>V</b><span>⌂</span><span>▦</span><span>⚙</span></div>
+            <div class="window-content">
+              <small>YOUR GAME, YOUR WAY</small>
+              <strong>Ready to play?</strong>
+              <div class="version-preview"><span>Minecraft version</span><b>Latest Release <span>⌄</span></b></div>
+              <div class="play-preview">▶ &nbsp; PLAY</div>
+            </div>
+          </div>
+        </div>
+        <div class="floating-tag tag-version"><span>✓</span> Versions, in one place</div>
+        <div class="floating-tag tag-java"><span>✦</span> Fabric ready</div>
+      </div>
+    </section>
+
+    <section class="trust-strip" aria-label="Launcher highlights">
+      <div><span class="strip-icon">◈</span> Native desktop launcher</div>
+      <div><span class="strip-icon">⌘</span> Your own game folder</div>
+      <div><span class="strip-icon">↻</span> Dynamic version catalog</div>
+      <div><span class="strip-icon">✳</span> Fabric support</div>
+    </section>
+
+    <section class="content-section section-wrap" id="features">
+      <div class="section-heading">
+        <p class="eyebrow">MADE TO GET OUT OF YOUR WAY</p>
+        <h2>Everything you need.<br><span>Nothing you don't.</span></h2>
+        <p>Spend less time setting up and more time in the world.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">◫</span>
+          <h3>Versions made simple</h3>
+          <p>Browse the live Minecraft release and snapshot catalog. Choose a version and install the files it needs.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">▧</span>
+          <h3>Your files, your folder</h3>
+          <p>Keep game versions, assets, and libraries in the VSMP Client game folder instead of relying on another launcher.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">✳</span>
+          <h3>Fabric ready</h3>
+          <p>Keep and select installed Fabric profiles alongside your vanilla Minecraft versions.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">▤</span>
+          <h3>Make it yours</h3>
+          <p>Choose your memory limit, manage local settings, and keep your launcher setup the way you like it.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">⌁</span>
+          <h3>See what's happening</h3>
+          <p>Follow installation status and view launch output when you need a little more detail.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">☾</span>
+          <h3>Easy on the eyes</h3>
+          <p>A calm, dark interface keeps the focus on your game, day or night.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="screens-section" id="screenshots">
+      <div class="section-wrap">
+        <div class="section-heading section-heading-row">
+          <div>
+            <p class="eyebrow">A LOOK INSIDE</p>
+            <h2>Made for the <span>moment before play.</span></h2>
+          </div>
+          <p>Simple controls. A clear view of your versions. Your next world is one click away.</p>
+        </div>
+        <div class="screens-grid">
+          <figure class="screen-card screen-wide">
+            <div class="mock-screen mock-home">
+              <div class="mock-sidebar"><b>V</b><span class="active">⌂</span><span>▦</span><span>♙</span><span>⚙</span></div>
+              <div class="mock-main">
+                <small>YOUR GAME, YOUR WAY</small>
+                <h3>Ready to play?</h3>
+                <p>Choose a profile and jump back into your world.</p>
+                <div class="mock-picker"><span>GAME VERSION</span><b>Latest Release — 1.21.x <span>⌄</span></b><small>Installed</small></div>
+                <div class="mock-buttons"><b>▶ &nbsp; PLAY</b><span>JOIN OUR SMP</span></div>
+              </div>
+            </div>
+            <figcaption><b>Your home screen</b><span>Pick a version and get playing.</span></figcaption>
+          </figure>
+          <figure class="screen-card">
+            <div class="mock-screen mock-settings">
+              <div class="mock-settings-title"><small>SETTINGS</small><h3>Your setup.</h3></div>
+              <div class="setting-row"><span>Game memory</span><b>4 GB <i>⌄</i></b></div>
+              <div class="setting-row"><span>Java runtime</span><b>Automatic <i>⌄</i></b></div>
+              <div class="setting-row"><span>Game folder</span><b>VSMP Client <i>›</i></b></div>
+              <div class="setting-save">SETTINGS SAVED LOCALLY</div>
+            </div>
+            <figcaption><b>Settings that stick</b><span>Your preferences stay on your PC.</span></figcaption>
+          </figure>
+        </div>
+        <p class="screens-note">Interface previews are illustrative and may differ slightly from the current release.</p>
+      </div>
+    </section>
+
+    <section class="content-section section-wrap changelog-section" id="changelog">
+      <div class="section-heading">
+        <p class="eyebrow">WHAT'S NEW</p>
+        <h2>Changelog<span>.</span></h2>
+        <p>A quick look at what's in the client.</p>
+      </div>
+      <div class="changelog-list">
+        <article class="change-entry">
+          <div class="change-version"><span class="change-dot"></span><b>Version management</b><small>Current</small></div>
+          <div class="change-content">
+            <h3>A better way to manage Minecraft versions</h3>
+            <p>Browse Mojang's live version catalog, install versions into your client folder, and see install status at a glance.</p>
+            <div class="change-tags"><span>Version catalog</span><span>Automatic installs</span><span>Fabric profiles</span></div>
+          </div>
+        </article>
+        <article class="change-entry">
+          <div class="change-version"><span class="change-dot"></span><b>Launcher update</b><small>Desktop</small></div>
+          <div class="change-content">
+            <h3>Your game, your way</h3>
+            <p>Private game folder, saved settings, selectable memory, Java runtime support, and clearer launch diagnostics.</p>
+            <div class="change-tags"><span>JavaFX</span><span>Local settings</span><span>Launch logs</span></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="download-cta section-wrap">
+      <div class="cta-glow"></div>
+      <div>
+        <p class="eyebrow">READY WHEN YOU ARE</p>
+        <h2>Make your next world <span>yours.</span></h2>
+        <p>Download VSMP Client for Windows and get your setup started.</p>
+      </div>
+      <a class="button button-primary download-link" href="./VSMPClient.exe" download>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m0 0 4-4m-4 4L6 8M3 14v3h14v-3" /></svg>
+        Download VSMP Client
+      </a>
+    </section>
+  </main>
+
+  <footer class="site-footer section-wrap">
+    <a class="brand footer-brand" href="#home">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M9 9h30v30H9z" fill="#e7bf68"/><path d="M15 16h6l3 10 3-10h6l-6.2 17h-5.6z" fill="#101321"/><path d="M34 8h6v6h-6z" fill="#fff0bd"/></svg>
+      <span>VSMP<span class="brand-light"> CLIENT</span></span>
+    </a>
+    <p>Built for your next adventure.</p>
+    <a class="footer-discord discord-link" href="https://discord.gg/" target="_blank" rel="noopener noreferrer">Join the Discord <span aria-hidden="true">↗</span></a>
+    <small>© <span id="current-year"></span> VSMP Client. Minecraft is a trademark of Mojang Studios.</small>
+  </footer>
+</body>
+</html>
