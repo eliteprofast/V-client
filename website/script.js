@@ -1,7 +1,7 @@
 "use strict";
 
-// The complete Windows app bundle, including the files required beside the launcher.
-const DOWNLOAD_URL = "./AzyrClient.zip";
+// A single-file setup executable that installs the bundled app and starts it.
+const DOWNLOAD_URL = "./VSMPClientSetup.exe";
 // Replace this with your server's invite URL before publishing.
 const DISCORD_URL = "https://discord.gg/";
 
