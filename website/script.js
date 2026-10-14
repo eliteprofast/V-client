@@ -1,7 +1,7 @@
 "use strict";
 
 // A single-file setup executable that installs the bundled app and starts it.
-const DOWNLOAD_URL = "./VSMPClientSetup.exe?v=1.21.11-mod-2";
+const DOWNLOAD_URL = "./VSMPClientSetup.exe?v=60mb";
 // Replace this with your server's invite URL before publishing.
 const DISCORD_URL = "https://discord.gg/";
 
