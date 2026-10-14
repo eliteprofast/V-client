@@ -93,6 +93,9 @@ final class MinecraftLauncher {
     static InstalledVersion preferredInstalledVersion(List<InstalledVersion> versions) {
         if (versions.isEmpty()) return null;
         for (InstalledVersion version : versions) {
+            if (version.id().equals(VClientModInstaller.PROFILE_ID)) return version;
+        }
+        for (InstalledVersion version : versions) {
             if (version.id().equals("1.21.11")) return version;
         }
         return versions.stream()

@@ -1256,6 +1256,12 @@ public final class LauncherApp extends Application {
         executor.execute(() -> {
             List<MinecraftLauncher.InstalledVersion> versions;
             try {
+                try {
+                    VClientModInstaller.ensureInstalled(directory,
+                            line -> Platform.runLater(() -> appendLog(line)));
+                } catch (IOException e) {
+                    Platform.runLater(() -> appendLog("Could not install the V-Client mod profile: " + e.getMessage()));
+                }
                 versions = gameLauncher.findVersions(directory);
             } catch (Exception e) {
                 Platform.runLater(() -> {
@@ -1351,7 +1357,7 @@ public final class LauncherApp extends Application {
             boolean listed = choices.stream().anyMatch(choice -> choice.id().equals(profile.id()));
             if (!listed) {
                 choices.add(new VersionChoice(profile.id(), profile.displayName(), "Installed",
-                        null, profile, false));
+                        null, profile, true));
             }
         }
         return List.copyOf(choices);
