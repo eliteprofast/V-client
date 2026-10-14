@@ -21,6 +21,7 @@ foreach ($path in @($compiler, $source, $payload, $icon)) {
     /reference:System.IO.Compression.dll `
     /reference:System.IO.Compression.FileSystem.dll `
     /reference:System.Windows.Forms.dll `
+    /reference:System.Drawing.dll `
     /resource:$payload,VSMPClient.Payload.zip `
     /out:$output `
     $source

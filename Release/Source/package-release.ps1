@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = $PSScriptRoot
 $sourceDirectory = Join-Path $repoRoot "src"
@@ -9,14 +9,24 @@ $appImageParent = Join-Path $repoRoot "target\release-app-image"
 $releaseStaging = Join-Path $repoRoot "target\release-staging"
 $jpackageInput = Join-Path $repoRoot "target\release-input"
 $javafxModules = Join-Path $repoRoot "target\javafx-modules"
-$zuluArchive = Join-Path $repoRoot "target\zulu21-win-x64.zip"
-$zuluExtracted = Join-Path $repoRoot "target\zulu21-extracted"
-$zuluRuntime = Join-Path $repoRoot "target\zulu21-runtime"
 $zipStaging = Join-Path $repoRoot "target\AzyrClient.zip.tmp"
 $javaHome = $env:JAVA_HOME
+# One runtime serves both the launcher and Minecraft 1.21.11, so it carries the full
+# Java SE platform plus the jdk.* modules Minecraft, Fabric, and Netty use.
+$runtimeModules = @(
+    "javafx.controls", "java.se", "jdk.accessibility", "jdk.charsets", "jdk.crypto.ec", "jdk.crypto.cryptoki",
+    "jdk.crypto.mscapi", "jdk.dynalink", "jdk.httpserver", "jdk.incubator.vector", "jdk.jdwp.agent", "jdk.jfr",
+    "jdk.jsobject", "jdk.localedata", "jdk.management", "jdk.management.agent", "jdk.management.jfr",
+    "jdk.naming.dns", "jdk.naming.rmi", "jdk.net", "jdk.nio.mapmode", "jdk.random", "jdk.sctp",
+    "jdk.security.auth", "jdk.security.jgss", "jdk.unsupported", "jdk.xml.dom", "jdk.zipfs"
+) -join ","
 
 if (-not $javaHome -or -not (Test-Path (Join-Path $javaHome "bin\jpackage.exe"))) {
-    throw "Set JAVA_HOME to a 64-bit JDK 21 installation before building the release."
+    throw "Set JAVA_HOME to a 64-bit Azul Zulu JDK 21 installation before building the release."
+}
+$javaRelease = Join-Path $javaHome "release"
+if (-not (Test-Path $javaRelease) -or ((Get-Content -Raw $javaRelease) -notmatch 'IMPLEMENTOR="Azul Systems') -or ((Get-Content -Raw $javaRelease) -notmatch 'JAVA_VERSION="21\.')) {
+    throw "JAVA_HOME must be an Azul Zulu JDK 21: V-Client also runs Minecraft on the bundled runtime and only accepts Azul Zulu builds."
 }
 if (-not (Get-Command mvn -ErrorAction SilentlyContinue)) {
     throw "Maven must be installed and available on PATH."
@@ -37,44 +47,6 @@ try {
         throw "The Maven build did not produce the launcher JAR."
     }
 
-    $zuluJava = Join-Path $zuluRuntime "bin\java.exe"
-    $zuluDetails = ""
-    if (Test-Path $zuluJava) {
-        $zuluDetails = (& $env:ComSpec /c "`"$zuluJava`" -XshowSettings:properties -version 2>&1" | Out-String)
-        if (($LASTEXITCODE -ne 0) -or ($zuluDetails -notmatch "os\.arch\s*=\s*amd64") -or ($zuluDetails -notmatch "java\.specification\.version\s*=\s*21") -or ($zuluDetails -notmatch "(?i)azul")) {
-            throw "The existing Azul Zulu runtime failed its Java 21, x64, or vendor verification; it was left untouched."
-        }
-        Write-Host "Reusing the verified Azul Zulu Java 21 x64 runtime in target."
-    } else {
-        $zuluMetadataUrl = "https://api.azul.com/metadata/v1/zulu/packages/?java_version=21&os=windows&arch=x86&hw_bitness=64&java_package_type=jre&archive_type=zip&release_status=ga&availability_types=CA&latest=true&bundle_type=jre"
-        Write-Host "Resolving the official 64-bit Azul Zulu Java 21 runtime..."
-        $zuluPackages = Invoke-RestMethod -Uri $zuluMetadataUrl -TimeoutSec 30
-        $zuluPackage = $zuluPackages |
-            Where-Object { $_.java_version[0] -eq 21 -and $_.name -like "*-ca-jre*-win_x64.zip" -and $_.name -notlike "*-fx-*" } |
-            Select-Object -First 1
-        if (-not $zuluPackage -or ([Uri]$zuluPackage.download_url).Host -ne "cdn.azul.com") {
-            throw "Azul did not return an official Windows x64 Zulu Java 21 JRE package."
-        }
-        if (Test-Path $zuluExtracted) {
-            Remove-Item -LiteralPath $zuluExtracted -Recurse -Force
-        }
-        Write-Host "Downloading $($zuluPackage.name)..."
-        Invoke-WebRequest -Uri $zuluPackage.download_url -OutFile $zuluArchive -TimeoutSec 300
-        Expand-Archive -LiteralPath $zuluArchive -DestinationPath $zuluExtracted -Force
-        $downloadedZuluJava = Get-ChildItem -LiteralPath $zuluExtracted -Filter "java.exe" -File -Recurse |
-            Select-Object -First 1
-        if (-not $downloadedZuluJava) {
-            throw "The official Azul Zulu archive did not contain java.exe."
-        }
-        $zuluDetails = (& $env:ComSpec /c "`"$($downloadedZuluJava.FullName)`" -XshowSettings:properties -version 2>&1" | Out-String)
-        if (($LASTEXITCODE -ne 0) -or ($zuluDetails -notmatch "os\.arch\s*=\s*amd64") -or ($zuluDetails -notmatch "java\.specification\.version\s*=\s*21") -or ($zuluDetails -notmatch "(?i)azul")) {
-            throw "The Azul Zulu runtime failed its Java 21, x64, or vendor verification."
-        }
-        New-Item -ItemType Directory -Path $zuluRuntime -Force | Out-Null
-        Copy-Item -Path (Join-Path $downloadedZuluJava.Directory.Parent.FullName "*") -Destination $zuluRuntime -Recurse -Force
-        Remove-Item -LiteralPath $zuluArchive -Force
-        Remove-Item -LiteralPath $zuluExtracted -Recurse -Force
-    }
 
     if (Test-Path $appImageParent) {
         Remove-Item -LiteralPath $appImageParent -Recurse -Force
@@ -106,7 +78,8 @@ try {
         --main-jar "V-Client.jar" `
         --main-class "com.vclient.LauncherApp" `
         --module-path $modulePath `
-        --add-modules "javafx.controls,java.desktop,java.logging,java.net.http,jdk.crypto.mscapi,jdk.crypto.ec" `
+        --add-modules $runtimeModules `
+        --jlink-options "--strip-debug --no-man-pages --no-header-files" `
         --java-options "--add-modules=javafx.controls,java.desktop,java.logging,java.net.http,jdk.crypto.mscapi,jdk.crypto.ec" `
         --dest $appImageParent
     if ($LASTEXITCODE -ne 0) {
@@ -120,9 +93,10 @@ try {
 
     New-Item -ItemType Directory -Path $releaseStaging | Out-Null
     Copy-Item -Path (Join-Path $packagedApplication "*") -Destination $releaseStaging -Recurse
-    $releaseRuntimes = Join-Path $releaseStaging "runtimes\zulu21"
-    New-Item -ItemType Directory -Path $releaseRuntimes -Force | Out-Null
-    Copy-Item -Path (Join-Path $zuluRuntime "*") -Destination $releaseRuntimes -Recurse -Force
+    $bundledJava = Join-Path $releaseStaging "runtime\bin\java.exe"
+    if (-not (Test-Path $bundledJava)) {
+        throw "The packaged runtime has no java.exe, so Minecraft could not use it."
+    }
     Copy-Item -LiteralPath $iconPath -Destination $releaseStaging
     Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination $releaseStaging
     $releaseSource = Join-Path $releaseStaging "Source"

@@ -314,7 +314,10 @@ final class JavaRuntimeManager {
         Path appDirectory = Files.isDirectory(codeSource) ? codeSource : codeSource.getParent();
         if (appDirectory == null) return null;
         Path bundle = appDirectory.getParent();
-        return bundle == null ? null : bundle.resolve("runtimes").resolve("zulu21");
+        if (bundle == null) return null;
+        // Older releases shipped a second runtime for Minecraft; newer ones reuse the launcher's own.
+        Path separateRuntime = bundle.resolve("runtimes").resolve("zulu21");
+        return Files.isDirectory(separateRuntime) ? separateRuntime : bundle.resolve("runtime");
     }
 
     private static Path findJavaExecutable(Path root) throws IOException {

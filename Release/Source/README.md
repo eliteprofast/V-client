@@ -49,3 +49,12 @@ mvn javafx:run
 ## Local data
 
 Settings are saved as JSON in `%APPDATA%\V-Client\settings.json`. Microsoft and Ely.by credentials are DPAPI-protected in `%APPDATA%\V-Client\accounts.dat` and can only be decrypted by the same Windows user on the same device. Offline usernames are saved separately in `%APPDATA%\V-Client\offline-accounts.json`; they contain no passwords or access tokens.
+
+## V-Client in-game mod (Minecraft 1.21.11)
+
+When Minecraft 1.21.11 is installed in V-Client's game folder, the launcher adds a **V-Client 1.21.11** profile and selects it by default. The profile runs Fabric Loader with the V-Client mod, and the launcher copies both from files bundled inside it, so nothing is downloaded. Mods installed from the Mods tab load in this profile too.
+
+- Title screen and menus use the launcher's animated night sky (stars, crescent moon, comet, hills).
+- **Right Shift** in game opens the V-Client mod menu: FPS, CPS, Ping, Coordinates, Keystrokes, Armor Status, Zoom (hold **C**), Fullbright, Toggle Sprint, Toggle Sneak, and the night-sky background. Click a card to toggle it; **EDIT HUD** lets you drag HUD elements, and **RESET HUD** restores default positions. Settings are saved in the game folder's `config/vclient.json`.
+
+The mod's source is in `mod/`. `mod/build-mod.sh` (Git Bash, with `JAVA_HOME` set to a JDK 21) builds Fabric Loader 0.19.5 and its tools from source using only GitHub and Maven Central, compiles the mod against the local 1.21.11 client jar with Yarn names, and stages the result in `src/main/resources/vclient-fabric`. Run it before `package-release.ps1` whenever the mod changes.

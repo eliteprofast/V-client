@@ -34,7 +34,7 @@ internal static class StandaloneInstaller
                     "Close V-Client before installing or updating it, then run this setup file again.");
             }
 
-            ExtractPayload(installDirectory);
+            RunWithProgress(installDirectory);
             Process.Start(new ProcessStartInfo
             {
                 FileName = executablePath,
@@ -66,7 +66,7 @@ internal static class StandaloneInstaller
                     "Release/V-Client.exe",
                     "Release/app/V-Client.cfg",
                     "Release/runtime/lib/modules",
-                    "Release/runtimes/zulu21/bin/java.exe"
+                    "Release/runtime/bin/java.exe"
                 };
                 string[] entries = archive.Entries.Select(entry => entry.FullName).ToArray();
                 foreach (string requiredEntry in requiredEntries)
@@ -97,10 +97,10 @@ internal static class StandaloneInstaller
                 Path.GetTempPath(), "VSMP-Setup-Verify-" + Guid.NewGuid().ToString("N"));
             try
             {
-                ExtractPayload(verificationDirectory);
+                ExtractPayload(verificationDirectory, null);
                 string runtimeModules = Path.Combine(verificationDirectory, "runtime", "lib", "modules");
                 string javaRuntime = Path.Combine(
-                    verificationDirectory, "runtimes", "zulu21", "bin", "java.exe");
+                    verificationDirectory, "runtime", "bin", "java.exe");
                 if (!File.Exists(runtimeModules) || !File.Exists(javaRuntime))
                 {
                     throw new InvalidDataException(
@@ -124,7 +124,54 @@ internal static class StandaloneInstaller
         }
     }
 
-    private static void ExtractPayload(string installDirectory)
+    /// <summary>Extracts the bundle on a worker thread while a progress window is shown.</summary>
+    private static void RunWithProgress(string installDirectory)
+    {
+        Application.EnableVisualStyles();
+        Exception failure = null;
+        using (Form window = new Form())
+        using (Label message = new Label())
+        using (ProgressBar bar = new ProgressBar())
+        {
+            window.Text = "VSMP Client Setup";
+            window.FormBorderStyle = FormBorderStyle.FixedDialog;
+            window.MaximizeBox = false;
+            window.MinimizeBox = false;
+            window.StartPosition = FormStartPosition.CenterScreen;
+            window.ClientSize = new System.Drawing.Size(420, 96);
+            window.ControlBox = false;
+            message.SetBounds(16, 16, 388, 22);
+            message.Text = "Installing V-Client...";
+            bar.SetBounds(16, 48, 388, 22);
+            bar.Minimum = 0;
+            bar.Maximum = 100;
+            window.Controls.Add(message);
+            window.Controls.Add(bar);
+            window.Shown += (sender, arguments) =>
+            {
+                System.Threading.ThreadPool.QueueUserWorkItem(state =>
+                {
+                    try
+                    {
+                        ExtractPayload(installDirectory, percent => window.BeginInvoke((Action)(() =>
+                        {
+                            bar.Value = percent;
+                            message.Text = "Installing V-Client... " + percent + "%";
+                        })));
+                    }
+                    catch (Exception exception)
+                    {
+                        failure = exception;
+                    }
+                    window.BeginInvoke((Action)(() => window.Close()));
+                });
+            };
+            Application.Run(window);
+        }
+        if (failure != null) throw failure;
+    }
+
+    private static void ExtractPayload(string installDirectory, Action<int> onProgress)
     {
         string installRoot = Path.GetFullPath(installDirectory) + Path.DirectorySeparatorChar;
         Directory.CreateDirectory(installDirectory);
@@ -132,8 +179,18 @@ internal static class StandaloneInstaller
         using (Stream payload = OpenPayload())
         using (ZipArchive archive = new ZipArchive(payload, ZipArchiveMode.Read))
         {
+            long totalBytes = Math.Max(1, archive.Entries.Sum(entry => entry.Length));
+            long writtenBytes = 0;
+            int reported = -1;
             foreach (ZipArchiveEntry entry in archive.Entries)
             {
+                writtenBytes += entry.Length;
+                int percent = (int)(writtenBytes * 100 / totalBytes);
+                if (onProgress != null && percent != reported)
+                {
+                    reported = percent;
+                    onProgress(Math.Min(100, percent));
+                }
                 if (!entry.FullName.StartsWith("Release/", StringComparison.Ordinal)
                     || entry.FullName.StartsWith("Release/Source/", StringComparison.Ordinal))
                 {
