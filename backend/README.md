@@ -22,7 +22,7 @@ Environment variables or a `.env` file (see [.env.example](.env.example)).
 | `TOKEN_SECRET` | generated | Signs login tokens; generated into `DATA_DIR/secret.key` when empty |
 | `ADMIN_USERNAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `admin` / – / random | First admin, created only if no admin exists. A random password is printed once |
 | `JAVA_HOST` / `JAVA_PORT` | `neuron.zeroxhost.space` / `19145` | VSMP Java address |
-| `BEDROCK_HOST` / `BEDROCK_PORT` | same host / `19132` | VSMP Bedrock address used by the Android **Play** button. **Set the real Bedrock port** |
+| `BEDROCK_HOST` / `BEDROCK_PORT` | same host / `19145` | VSMP Bedrock address used by the Android **Play** button |
 | `DISCORD_URL`, `WEBSITE_URL` | empty | Shown on the site and in both apps |
 | `TRUST_PROXY` | `0` | Set `1` behind nginx/Caddy/Cloudflare so rate limits use the real client IP |
 | `MAX_UPLOAD_MB` | `300` | Largest installer accepted |

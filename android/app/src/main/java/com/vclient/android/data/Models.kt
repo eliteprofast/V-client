@@ -10,7 +10,7 @@ data class SavedServer(val name: String, val endpoint: Endpoint)
 data class ServerConfig(
     val name: String = "VSMP",
     val java: Endpoint = Endpoint("neuron.zeroxhost.space", 19145),
-    val bedrock: Endpoint = Endpoint("neuron.zeroxhost.space", 19132),
+    val bedrock: Endpoint = Endpoint("neuron.zeroxhost.space", 19145),
     val discordUrl: String = "",
     val websiteUrl: String = "",
 )

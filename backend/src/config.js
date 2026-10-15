@@ -40,7 +40,7 @@ function buildConfig(overrides = {}) {
       javaHost: env('JAVA_HOST', 'neuron.zeroxhost.space'),
       javaPort: int('JAVA_PORT', 19145),
       bedrockHost: env('BEDROCK_HOST', env('JAVA_HOST', 'neuron.zeroxhost.space')),
-      bedrockPort: int('BEDROCK_PORT', 19132),
+      bedrockPort: int('BEDROCK_PORT', 19145),
       discordUrl: env('DISCORD_URL', ''),
       websiteUrl: env('WEBSITE_URL', ''),
     },
