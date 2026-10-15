@@ -19,6 +19,10 @@ final class LauncherSettings {
     private String lastAccountId;
     private String discordInvite;
     private boolean offlineMode;
+    private String backendUrl = "";
+    private String backendToken = "";
+    private String installId = "";
+    private boolean autoUpdate = true;
 
     private LauncherSettings(Path minecraftDirectory, int memoryGb, int javaMajorOverride,
                              String lastAccountId, String discordInvite, boolean offlineMode) {
@@ -35,7 +39,9 @@ final class LauncherSettings {
                 Path.of(System.getProperty("user.home"), "AppData", "Roaming").toString()));
         Path defaultDirectory = privateMinecraftDirectory(appData);
         if (!Files.exists(SETTINGS_FILE)) {
-            return new LauncherSettings(defaultDirectory, defaultMemory(), 0, "", "", true);
+            LauncherSettings fresh = new LauncherSettings(defaultDirectory, defaultMemory(), 0, "", "", true);
+            fresh.installId = java.util.UUID.randomUUID().toString();
+            return fresh;
         }
         ObjectNode saved = (ObjectNode) JSON.readTree(SETTINGS_FILE.toFile());
         String directory = saved.path("minecraftDirectory").asText(defaultDirectory.toString());
@@ -48,7 +54,13 @@ final class LauncherSettings {
                 saved.path("lastAccountId").asText(""),
                 saved.path("discordInvite").asText(""),
                 saved.path("offlineMode").asBoolean(true));
-        if (!minecraftDirectory.equals(selectedDirectory)) settings.save();
+        settings.backendUrl = saved.path("backendUrl").asText("");
+        settings.backendToken = saved.path("backendToken").asText("");
+        settings.autoUpdate = saved.path("autoUpdate").asBoolean(true);
+        settings.installId = saved.path("installId").asText("");
+        boolean newInstallId = settings.installId.isBlank();
+        if (newInstallId) settings.installId = java.util.UUID.randomUUID().toString();
+        if (!minecraftDirectory.equals(selectedDirectory) || newInstallId) settings.save();
         return settings;
     }
 
@@ -88,6 +100,10 @@ final class LauncherSettings {
         saved.put("lastAccountId", lastAccountId);
         saved.put("discordInvite", discordInvite);
         saved.put("offlineMode", offlineMode);
+        saved.put("backendUrl", backendUrl);
+        saved.put("backendToken", backendToken);
+        saved.put("autoUpdate", autoUpdate);
+        saved.put("installId", installId);
         JSON.writerWithDefaultPrettyPrinter().writeValue(SETTINGS_FILE.toFile(), saved);
     }
 
@@ -140,6 +156,36 @@ final class LauncherSettings {
 
     void setOfflineMode(boolean offlineMode) {
         this.offlineMode = offlineMode;
+    }
+
+    String backendUrl() {
+        return backendUrl;
+    }
+
+    void setBackendUrl(String backendUrl) {
+        this.backendUrl = backendUrl == null ? "" : backendUrl;
+    }
+
+    /** Session token for the player's V-Client account; empty when signed out. */
+    String backendToken() {
+        return backendToken;
+    }
+
+    void setBackendToken(String backendToken) {
+        this.backendToken = backendToken == null ? "" : backendToken;
+    }
+
+    /** Random id for anonymous usage counts. It is not derived from the PC or the player. */
+    String installId() {
+        return installId;
+    }
+
+    boolean autoUpdate() {
+        return autoUpdate;
+    }
+
+    void setAutoUpdate(boolean autoUpdate) {
+        this.autoUpdate = autoUpdate;
     }
 
     static int maxMemory() {

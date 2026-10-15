@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Gold tile with the V mark, inside the adaptive-icon safe zone. -->
+    <path
+        android:fillColor="#E7BF68"
+        android:pathData="M30,30h48v48h-48z" />
+    <path
+        android:fillColor="#101321"
+        android:pathData="M39,41h9.6l5.4,16 5.4,-16h9.6l-10,27h-10z" />
+    <path
+        android:fillColor="#FFF0BD"
+        android:pathData="M70,26h9v9h-9z" />
+</vector>

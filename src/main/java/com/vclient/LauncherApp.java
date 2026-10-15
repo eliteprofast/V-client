@@ -64,7 +64,7 @@ import java.util.function.Consumer;
 
 public final class LauncherApp extends Application {
     private enum Page {
-        HOME, LIBRARY, MODS, BOOST, WARDROBE, FRIENDS, CONSOLE, SETTINGS, DISCORD
+        HOME, LIBRARY, MODS, BOOST, WARDROBE, FRIENDS, NEWS, LOGS, CONSOLE, SETTINGS, DISCORD
     }
 
     private record VersionChoice(String id, String label, String status,
@@ -151,6 +151,7 @@ public final class LauncherApp extends Application {
         if (account == null) showLogin();
         else showHome();
         stage.show();
+        startBackendTasks();
     }
 
     private void showHome() {
@@ -165,6 +166,12 @@ public final class LauncherApp extends Application {
         Label title = label("Ready to play?", 34, "#f3f6fc");
         Label subtitle = label("Choose a profile and jump back into your world.", 14, MUTED);
         VBox heading = new VBox(8, eyebrow, title, subtitle);
+        Region homeStatusDot = dot("#64728a");
+        Label homeStatus = label("", 12, "#b3c0d3");
+        HBox homeStatusRow = new HBox(8, homeStatusDot, homeStatus);
+        homeStatusRow.setAlignment(Pos.CENTER_LEFT);
+        loadServerStatus(homeStatus, homeStatusDot);
+        VBox homeAnnouncements = announcementBox();
 
         VBox versionCard = card();
         Label versionTitle = label("GAME VERSION", 11, MUTED);
@@ -248,7 +255,7 @@ public final class LauncherApp extends Application {
         log.setStyle("-fx-control-inner-background: rgba(9, 10, 28, 0.82); -fx-text-fill: #c3bfdc; -fx-font-family: 'Consolas'; -fx-font-size: 11px; -fx-background-color: rgba(9, 10, 28, 0.82); -fx-border-color: #37334f; -fx-border-radius: 8; -fx-background-radius: 8;");
         log.setText(String.join(System.lineSeparator(), logLines));
         VBox.setVgrow(log, Priority.ALWAYS);
-        content.getChildren().addAll(heading, versionCard, launchRow, statusRow, logTitle, log);
+        content.getChildren().addAll(heading, homeAnnouncements, homeStatusRow, versionCard, launchRow, statusRow, logTitle, log);
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
         refreshVersions(selectedVersionId);
@@ -648,6 +655,445 @@ public final class LauncherApp extends Application {
         content.getChildren().addAll(actions, consoleLog);
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+    }
+
+    // ---- VSMP backend: news, announcements, server status, accounts, updates, error logs ----
+
+    private BackendClient backend() {
+        return new BackendClient(BackendClient.resolveUrl(settings.backendUrl()));
+    }
+
+    private static String announcementColor(String level) {
+        return switch (level) {
+            case "critical" -> "#5a1c26";
+            case "warning" -> "#4a3a12";
+            default -> "#17315a";
+        };
+    }
+
+    /** A box that fills itself with active announcements; stays empty when the backend is unavailable. */
+    private VBox announcementBox() {
+        VBox box = new VBox(8);
+        BackendClient client = backend();
+        if (!client.configured()) return box;
+        executor.execute(() -> {
+            try {
+                List<BackendClient.Announcement> items = client.announcements();
+                Platform.runLater(() -> {
+                    for (BackendClient.Announcement item : items) {
+                        Label message = label(item.message(), 12, "#f3f6fc");
+                        message.setWrapText(true);
+                        HBox row = new HBox(message);
+                        row.setPadding(new Insets(10, 14, 10, 14));
+                        row.setStyle("-fx-background-color: " + announcementColor(item.level()) + "; -fx-background-radius: 9;");
+                        box.getChildren().add(row);
+                    }
+                });
+            } catch (IOException | InterruptedException e) {
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            }
+        });
+        return box;
+    }
+
+    /** Fills {@code target} with the VSMP server state; safe to call from the FX thread. */
+    private void loadServerStatus(Label target, Region indicator) {
+        BackendClient client = backend();
+        if (!client.configured()) {
+            target.setText("VSMP status unavailable — set the backend address on the News page.");
+            return;
+        }
+        target.setText("Checking VSMP…");
+        executor.execute(() -> {
+            try {
+                BackendClient.ServerStatus state = client.serverStatus();
+                Platform.runLater(() -> {
+                    indicator.setStyle("-fx-background-color: " + (state.online() ? "#39d98a" : "#e5626f") + "; -fx-background-radius: 50%;");
+                    target.setText(state.online()
+                            ? "VSMP ONLINE  ·  " + state.players() + " / " + state.maxPlayers() + " players  ·  " + state.version()
+                            : "VSMP is offline right now");
+                });
+            } catch (IOException | InterruptedException e) {
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                Platform.runLater(() -> target.setText("VSMP status unavailable (" + e.getMessage() + ")"));
+            }
+        });
+    }
+
+    private void showNews() {
+        activePage = Page.NEWS;
+        settingsPage = false;
+        updateNavigationState();
+        StackPane root = baseLayout();
+        VBox content = pageContent("Community", "News", "Launcher updates and VSMP server announcements, shared with the Windows and Android apps.");
+        BackendClient client = backend();
+
+        VBox statusCard = card();
+        Region indicator = dot("#64728a");
+        Label statusText = label("", 13, "#e6ebf7");
+        Button refreshStatus = button("REFRESH", "#292642", 10);
+        refreshStatus.setOnAction(event -> loadServerStatus(statusText, indicator));
+        Button website = button("OPEN WEBSITE", "#292642", 10);
+        website.setDisable(!client.configured());
+        website.setOnAction(event -> openExternalPage(client.baseUrl()));
+        HBox statusRow = new HBox(10, indicator, statusText);
+        statusRow.setAlignment(Pos.CENTER_LEFT);
+        statusCard.getChildren().addAll(label("SERVER STATUS", 11, MUTED), statusRow, new HBox(10, refreshStatus, website));
+        loadServerStatus(statusText, indicator);
+
+        VBox posts = new VBox(12);
+        if (client.configured()) {
+            posts.getChildren().add(label("Loading news…", 12, MUTED));
+            executor.execute(() -> {
+                try {
+                    List<BackendClient.NewsPost> items = client.news(20);
+                    Platform.runLater(() -> {
+                        posts.getChildren().clear();
+                        if (items.isEmpty()) posts.getChildren().add(label("No news yet. Check back soon.", 12, MUTED));
+                        for (BackendClient.NewsPost post : items) posts.getChildren().add(newsCard(post));
+                    });
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    Platform.runLater(() -> {
+                        posts.getChildren().setAll(label("News could not be loaded: " + e.getMessage(), 12, "#ff9aa5"));
+                    });
+                }
+            });
+        } else {
+            posts.getChildren().add(label("Set the V-Client backend address below to load news.", 12, MUTED));
+        }
+
+        content.getChildren().addAll(announcementBox(), statusCard, posts, accountCard(root), backendCard());
+        setPageContent(root, content);
+        stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+    }
+
+    private VBox newsCard(BackendClient.NewsPost post) {
+        VBox box = card();
+        String tag = (post.pinned() ? "PINNED  ·  " : "") + post.category().toUpperCase()
+                + "  ·  " + (post.createdAt().length() >= 10 ? post.createdAt().substring(0, 10) : post.createdAt());
+        Label meta = label(tag, 10, post.category().equals("server") ? "#6fd39b" : ACCENT);
+        Label title = label(post.title(), 17, "#f3f6fc");
+        title.setWrapText(true);
+        Label body = label(post.body(), 12, "#c3bfdc");
+        body.setWrapText(true);
+        box.getChildren().addAll(meta, title, body);
+        return box;
+    }
+
+    private VBox accountCard(StackPane root) {
+        VBox box = card();
+        box.getChildren().add(label("V-CLIENT ACCOUNT", 11, MUTED));
+        BackendClient client = backend();
+        Label result = label("", 11, MUTED);
+        result.setWrapText(true);
+        if (!settings.backendToken().isBlank() && client.configured()) {
+            Label who = label("Checking your account…", 13, "#e6ebf7");
+            TextField minecraft = new TextField();
+            minecraft.setPromptText("Minecraft username");
+            minecraft.setStyle(fieldStyle());
+            TextField ely = new TextField();
+            ely.setPromptText("Ely.by username");
+            ely.setStyle(fieldStyle());
+            Button save = button("SAVE LINKED NAMES", ACCENT, 10);
+            Button signOut = button("SIGN OUT", "#482332", 10);
+            save.setDisable(true);
+            box.getChildren().addAll(who, minecraft, ely, new HBox(10, save, signOut), result);
+            executor.execute(() -> {
+                try {
+                    BackendClient.Session session = client.profile(settings.backendToken());
+                    Platform.runLater(() -> {
+                        who.setText("Signed in as " + session.username());
+                        minecraft.setText(session.minecraftName());
+                        ely.setText(session.elybyName());
+                        save.setDisable(false);
+                    });
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    boolean expired = e instanceof BackendClient.BackendException;
+                    Platform.runLater(() -> {
+                        if (expired) {
+                            settings.setBackendToken("");
+                            saveSettings();
+                            showNews();
+                        } else {
+                            who.setText("Could not reach the backend: " + e.getMessage());
+                        }
+                    });
+                }
+            });
+            save.setOnAction(event -> executor.execute(() -> {
+                try {
+                    client.linkNames(settings.backendToken(), minecraft.getText().strip(), ely.getText().strip());
+                    Platform.runLater(() -> result.setText("Linked names saved to your V-Client account."));
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    Platform.runLater(() -> result.setText(e.getMessage()));
+                }
+            }));
+            signOut.setOnAction(event -> {
+                settings.setBackendToken("");
+                saveSettings();
+                showNews();
+            });
+        } else {
+            box.getChildren().add(label("One account for Windows, Android and the website. Optional — you can play without it.", 11, MUTED));
+            TextField login = new TextField();
+            login.setPromptText("Username or email");
+            login.setStyle(fieldStyle());
+            TextField email = new TextField();
+            email.setPromptText("Email (only needed to create an account)");
+            email.setStyle(fieldStyle());
+            PasswordField password = new PasswordField();
+            password.setPromptText("Password (8+ characters)");
+            password.setStyle(fieldStyle());
+            Button signIn = button("SIGN IN", ACCENT, 10);
+            Button create = button("CREATE ACCOUNT", "#292642", 10);
+            signIn.setDisable(!client.configured());
+            create.setDisable(!client.configured());
+            box.getChildren().addAll(login, email, password, new HBox(10, signIn, create), result);
+            java.util.function.Consumer<Boolean> submit = register -> {
+                signIn.setDisable(true);
+                create.setDisable(true);
+                String loginText = login.getText().strip();
+                String emailText = email.getText().strip();
+                String passwordText = password.getText();
+                result.setText("Contacting the backend…");
+                executor.execute(() -> {
+                    try {
+                        BackendClient.Session session = register
+                                ? client.register(loginText, emailText, passwordText)
+                                : client.login(loginText, passwordText);
+                        Platform.runLater(() -> {
+                            settings.setBackendToken(session.token());
+                            saveSettings();
+                            showNews();
+                        });
+                    } catch (IOException | InterruptedException e) {
+                        if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                        Platform.runLater(() -> {
+                            result.setText(e.getMessage());
+                            signIn.setDisable(false);
+                            create.setDisable(false);
+                        });
+                    }
+                });
+            };
+            signIn.setOnAction(event -> submit.accept(false));
+            create.setOnAction(event -> submit.accept(true));
+        }
+        return box;
+    }
+
+    private VBox backendCard() {
+        VBox box = card();
+        box.getChildren().add(label("BACKEND & UPDATES", 11, MUTED));
+        TextField url = new TextField(settings.backendUrl());
+        url.setPromptText("https://your-vclient-backend.example.com");
+        url.setStyle(fieldStyle());
+        Label result = label("V-Client " + AppInfo.VERSION
+                + (BackendClient.resolveUrl("").equals(System.getenv("VCLIENT_BACKEND_URL")) ? "  ·  backend set by VCLIENT_BACKEND_URL" : ""), 11, MUTED);
+        result.setWrapText(true);
+        Button save = button("SAVE ADDRESS", ACCENT, 10);
+        Button check = button("CHECK FOR UPDATES", "#292642", 10);
+        Button auto = button("", "#292642", 10);
+        Runnable refreshAuto = () -> auto.setText(settings.autoUpdate() ? "AUTO-UPDATE: ON" : "AUTO-UPDATE: OFF");
+        refreshAuto.run();
+        save.setOnAction(event -> {
+            String address = BackendClient.normalize(url.getText());
+            if (!address.isEmpty() && !BackendClient.isValidUrl(address)) {
+                result.setText("Enter a full address starting with https:// (or http:// for a local test server).");
+                return;
+            }
+            settings.setBackendUrl(address);
+            saveSettings();
+            showNews();
+        });
+        check.setOnAction(event -> checkForUpdates(true));
+        auto.setOnAction(event -> {
+            settings.setAutoUpdate(!settings.autoUpdate());
+            saveSettings();
+            refreshAuto.run();
+        });
+        box.getChildren().addAll(url, new HBox(10, save, check, auto), result);
+        return box;
+    }
+
+    // ---- Updates ----
+
+    private void checkForUpdates(boolean manual) {
+        BackendClient client = backend();
+        if (!client.configured()) {
+            if (manual) showError("Updates unavailable", new IOException("Set the V-Client backend address first."));
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                BackendClient.UpdateInfo info = client.checkForUpdate(AppInfo.VERSION);
+                Platform.runLater(() -> {
+                    if (info.updateAvailable() && info.latest() != null && info.latest().url().endsWith(".exe")) {
+                        promptUpdate(info);
+                    } else if (manual) {
+                        Alert alert = new Alert(Alert.AlertType.INFORMATION, "You are running the latest version (" + AppInfo.VERSION + ").");
+                        alert.initOwner(stage);
+                        alert.setHeaderText("V-Client is up to date");
+                        alert.show();
+                    }
+                });
+            } catch (IOException | InterruptedException e) {
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                Platform.runLater(() -> {
+                    appendLog("Update check failed: " + e.getMessage());
+                    if (manual) showError("Could not check for updates", e);
+                });
+            }
+        });
+    }
+
+    private void promptUpdate(BackendClient.UpdateInfo info) {
+        BackendClient.Release release = info.latest();
+        ButtonType install = new ButtonType("Update now", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        ButtonType later = info.mandatory()
+                ? new ButtonType("Quit", javafx.scene.control.ButtonBar.ButtonData.CANCEL_CLOSE)
+                : new ButtonType("Later", javafx.scene.control.ButtonBar.ButtonData.CANCEL_CLOSE);
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "", install, later);
+        alert.initOwner(stage);
+        alert.setTitle("V-Client update");
+        alert.setHeaderText("V-Client " + release.version() + " is available" + (info.mandatory() ? " (required)" : ""));
+        alert.setContentText((release.notes().isBlank() ? "Bug fixes and improvements." : release.notes())
+                + "\n\nYou have " + AppInfo.VERSION + ". The installer will be downloaded, checked, and started; V-Client closes while it installs.");
+        alert.getDialogPane().setPrefWidth(520);
+        alert.showAndWait().ifPresent(choice -> {
+            if (choice == install) downloadUpdate(release);
+            else if (info.mandatory()) Platform.exit();
+        });
+    }
+
+    private void downloadUpdate(BackendClient.Release release) {
+        javafx.scene.control.ProgressBar bar = new javafx.scene.control.ProgressBar(0);
+        bar.setPrefWidth(420);
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.initOwner(stage);
+        dialog.setTitle("Updating V-Client");
+        dialog.setHeaderText("Downloading V-Client " + release.version() + "…");
+        dialog.getDialogPane().setContent(bar);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+        Thread worker = new Thread(() -> {
+            try {
+                Path installer = UpdateService.download(release, fraction -> Platform.runLater(() -> bar.setProgress(fraction)));
+                backend().reportEvent(settings.installId(), "update");
+                UpdateService.launchInstallerAfterExit(installer);
+                Platform.runLater(() -> {
+                    dialog.close();
+                    Platform.exit();
+                    System.exit(0);
+                });
+            } catch (IOException | InterruptedException e) {
+                Platform.runLater(() -> {
+                    dialog.close();
+                    if (!(e instanceof InterruptedException)) showError("Update failed", e);
+                });
+            }
+        }, "vclient-update");
+        worker.setDaemon(true);
+        worker.start();
+        dialog.showAndWait();
+        worker.interrupt();
+    }
+
+    // ---- Error logs ----
+
+    private void showLogs() {
+        activePage = Page.LOGS;
+        settingsPage = false;
+        updateNavigationState();
+        StackPane root = baseLayout();
+        VBox content = pageContent("Diagnostics", "Error logs",
+                "The latest launch log, Minecraft crash report, and this session's launcher output. Copy any of them when asking for help.");
+        Path logsDirectory = settings.minecraftDirectory().resolve("logs");
+        Path crashDirectory = settings.minecraftDirectory().resolve("crash-reports");
+        TextArea viewer = new TextArea("Choose a log above.");
+        viewer.setEditable(false);
+        viewer.setWrapText(false);
+        viewer.setPrefRowCount(24);
+        viewer.setStyle("-fx-control-inner-background: rgba(9, 10, 28, 0.82); -fx-text-fill: #c3bfdc; -fx-font-family: 'Consolas'; -fx-font-size: 11px; -fx-background-color: rgba(9, 10, 28, 0.82); -fx-border-color: #37334f; -fx-border-radius: 8; -fx-background-radius: 8;");
+        VBox.setVgrow(viewer, Priority.ALWAYS);
+        Button launchLog = button("LAUNCH LOG", "#292642", 10);
+        Button crash = button("LATEST CRASH REPORT", "#292642", 10);
+        Button session = button("LAUNCHER OUTPUT", "#292642", 10);
+        Button copy = button("COPY", "#292642", 10);
+        Button openFolder = button("OPEN LOGS FOLDER", "#292642", 10);
+        launchLog.setOnAction(event -> showLogFile(viewer, logsDirectory.resolve("vclient-launch.log"), "No launch log yet. It is written the first time you press Play."));
+        crash.setOnAction(event -> showLogFile(viewer, newestFile(crashDirectory), "No crash reports found. That is good news."));
+        session.setOnAction(event -> viewer.setText(logLines.isEmpty() ? "No launcher output in this session yet." : String.join(System.lineSeparator(), logLines)));
+        copy.setOnAction(event -> {
+            ClipboardContent clipboard = new ClipboardContent();
+            clipboard.putString(viewer.getText());
+            Clipboard.getSystemClipboard().setContent(clipboard);
+        });
+        openFolder.setOnAction(event -> {
+            try {
+                Files.createDirectories(logsDirectory);
+                Desktop.getDesktop().open(logsDirectory.toFile());
+            } catch (IOException | UnsupportedOperationException e) {
+                showError("Could not open the logs folder", e);
+            }
+        });
+        javafx.scene.layout.FlowPane actions = new javafx.scene.layout.FlowPane(10, 10, launchLog, crash, session, copy, openFolder);
+        content.getChildren().addAll(actions, viewer);
+        setPageContent(root, content);
+        stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+        launchLog.fire();
+    }
+
+    private void showLogFile(TextArea viewer, Path file, String missingMessage) {
+        if (file == null || !Files.isRegularFile(file)) {
+            viewer.setText(missingMessage);
+            return;
+        }
+        viewer.setText("Loading " + file.getFileName() + "…");
+        executor.execute(() -> {
+            String text;
+            try {
+                text = tail(file, 120_000);
+            } catch (IOException e) {
+                text = "Could not read " + file + ": " + e.getMessage();
+            }
+            String shown = text;
+            Platform.runLater(() -> {
+                viewer.setText(shown);
+                viewer.positionCaret(shown.length());
+            });
+        });
+    }
+
+    /** Reads at most the last {@code maxChars} characters of a text file. */
+    static String tail(Path file, int maxChars) throws IOException {
+        String text = Files.readString(file, java.nio.charset.StandardCharsets.UTF_8);
+        return text.length() <= maxChars ? text : "… (earlier output omitted)\n" + text.substring(text.length() - maxChars);
+    }
+
+    private static Path newestFile(Path directory) {
+        if (!Files.isDirectory(directory)) return null;
+        try (java.util.stream.Stream<Path> files = Files.list(directory)) {
+            return files.filter(Files::isRegularFile)
+                    .max(java.util.Comparator.comparingLong(file -> file.toFile().lastModified()))
+                    .orElse(null);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /** Anonymous usage counters, on a background thread so the UI never waits for the network. */
+    private void reportEventAsync(String event) {
+        BackendClient client = backend();
+        if (!client.configured()) return;
+        executor.execute(() -> client.reportEvent(settings.installId(), event));
+    }
+
+    private void startBackendTasks() {
+        reportEventAsync("launch");
+        if (settings.autoUpdate()) checkForUpdates(false);
     }
 
     private void showDiscord() {
@@ -1182,8 +1628,8 @@ public final class LauncherApp extends Application {
             Button item = button(navigationText(page), "transparent", 10);
             item.setMinWidth(76);
             item.setPrefWidth(76);
-            item.setMinHeight(52);
-            item.setMaxHeight(52);
+            item.setMinHeight(44);
+            item.setMaxHeight(44);
             item.setWrapText(true);
             item.setOnAction(event -> navigate(page));
             navigationButtons.put(page, item);
@@ -1203,6 +1649,8 @@ public final class LauncherApp extends Application {
             case BOOST -> showBoost();
             case WARDROBE -> showWardrobe();
             case FRIENDS -> showFriends();
+            case NEWS -> showNews();
+            case LOGS -> showLogs();
             case CONSOLE -> showConsole();
             case SETTINGS -> showSettings();
             case DISCORD -> showDiscord();
@@ -1227,6 +1675,8 @@ public final class LauncherApp extends Application {
             case BOOST -> "ϟ\nBoost";
             case WARDROBE -> "♧\nWardrobe";
             case FRIENDS -> "♟\nFriends";
+            case NEWS -> "✉\nNews";
+            case LOGS -> "⚠\nLogs";
             case CONSOLE -> ">_\nConsole";
             case SETTINGS -> "⚙\nSettings";
             case DISCORD -> "◉\nDiscord";
@@ -1525,6 +1975,7 @@ public final class LauncherApp extends Application {
         }
         MinecraftLauncher.InstalledVersion selected = choice.installed();
         PlayerAccount selectedAccount = account;
+        reportEventAsync(joinSmp ? "join" : "play");
         boolean offline = settings.offlineMode();
         Button launchingButton = joinSmp ? singleplayerButton : playButton;
         playButton.setDisable(true);

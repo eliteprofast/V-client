@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b16">
+  <meta name="description" content="Everything V-Client does on Windows and Android, and how to join the VSMP server.">
+  <title>Features — V-Client</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./script.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="V-Client home">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M9 9h30v30H9z" fill="#e7bf68"/><path d="M15 16h6l3 10 3-10h6l-6.2 17h-5.6z" fill="#101321"/><path d="M34 8h6v6h-6z" fill="#fff0bd"/></svg>
+      <span>V<span class="brand-light">-CLIENT</span></span>
+    </a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
+      <span class="sr-only">Toggle navigation</span><span></span><span></span><span></span>
+    </button>
+    <nav class="site-nav" id="site-nav" aria-label="Main navigation">
+      <a href="index.html">Home</a>
+      <a href="downloads.html">Downloads</a>
+      <a href="features.html">Features</a>
+      <a href="news.html">News</a>
+      <a class="nav-discord discord-link" href="https://discord.gg/" target="_blank" rel="noopener noreferrer">Discord ↗</a>
+    </nav>
+  </header>
+
+  <div id="announcement-banner" class="announcement-banner" role="status" hidden></div>
+
+  <main class="section-wrap page-main">
+    <div class="section-heading">
+      <p class="eyebrow">WHAT YOU GET</p>
+      <h1 class="page-title">Features<span>.</span></h1>
+      <p>A launcher built around one server. Everything is one click from the Play button.</p>
+    </div>
+
+    <h2 class="group-title">Windows launcher</h2>
+    <div class="feature-grid">
+      <article class="feature-card"><span class="feature-icon">▶</span><h3>Play and one-click join</h3><p>Launch any installed version, or join VSMP directly with the server address preconfigured.</p></article>
+      <article class="feature-card"><span class="feature-icon">◫</span><h3>Version selector</h3><p>Live Mojang release and snapshot catalog, plus Fabric and Forge profiles, with automatic installs.</p></article>
+      <article class="feature-card"><span class="feature-icon">☺</span><h3>Ely.by, Microsoft and offline</h3><p>Sign in with Ely.by (including two-factor), Microsoft, or play offline. Multiple accounts are supported.</p></article>
+      <article class="feature-card"><span class="feature-icon">▤</span><h3>RAM and Java</h3><p>Pick the memory limit; matching Java runtimes are downloaded and verified for you.</p></article>
+      <article class="feature-card"><span class="feature-icon">⌁</span><h3>Error logs</h3><p>Launch logs, Minecraft output and crash reports in one page, with copy and open-folder buttons.</p></article>
+      <article class="feature-card"><span class="feature-icon">↻</span><h3>Automatic updates</h3><p>V-Client checks for new builds on start and offers one-click download of the new installer.</p></article>
+    </div>
+
+    <h2 class="group-title">Android app</h2>
+    <div class="feature-grid">
+      <article class="feature-card"><span class="feature-icon">▶</span><h3>Quick connect</h3><p>One tap opens Minecraft Bedrock and connects to VSMP. Java players get a copy-address button.</p></article>
+      <article class="feature-card"><span class="feature-icon">◉</span><h3>Live server status</h3><p>Online state, player count and ping for both Java and Bedrock.</p></article>
+      <article class="feature-card"><span class="feature-icon">✉</span><h3>News and announcements</h3><p>The same feed as the Windows launcher and this website.</p></article>
+      <article class="feature-card"><span class="feature-icon">☺</span><h3>One account</h3><p>Sign in with your V-Client account and link your Minecraft and Ely.by names.</p></article>
+      <article class="feature-card"><span class="feature-icon">↻</span><h3>In-app updates</h3><p>New APKs are downloaded and verified with SHA-256 before Android’s installer opens.</p></article>
+      <article class="feature-card"><span class="feature-icon">☾</span><h3>Material 3 design</h3><p>The V-Client night theme, built with Jetpack Compose.</p></article>
+    </div>
+
+    <section class="vsmp-info" data-server-status>
+      <div class="section-heading">
+        <p class="eyebrow">THE SERVER</p>
+        <h2>About <span>VSMP.</span></h2>
+        <p>VSMP is the Minecraft survival multiplayer server this launcher is built for. V-Client keeps you on the right version, with the V-Client mod installed, and keeps you up to date with what is happening on the server.</p>
+      </div>
+      <dl class="address-list">
+        <div><dt>Status</dt><dd><b data-status-state>Checking…</b> · <span data-status-players>—</span> players</dd></div>
+        <div><dt>Java Edition</dt><dd><code id="java-address" data-java-address>neuron.zeroxhost.space:19145</code> <button class="copy-button" data-copy="#java-address" type="button">Copy</button></dd></div>
+        <div><dt>Bedrock Edition</dt><dd><code id="bedrock-address" data-bedrock-address>—</code> <button class="copy-button" data-copy="#bedrock-address" type="button">Copy</button></dd></div>
+      </dl>
+    </section>
+  </main>
+
+  <footer class="site-footer section-wrap">
+    <a class="brand footer-brand" href="index.html">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M9 9h30v30H9z" fill="#e7bf68"/><path d="M15 16h6l3 10 3-10h6l-6.2 17h-5.6z" fill="#101321"/><path d="M34 8h6v6h-6z" fill="#fff0bd"/></svg>
+      <span>V<span class="brand-light">-CLIENT</span></span>
+    </a>
+    <p>Built for your next adventure.</p>
+    <a class="footer-discord discord-link" href="https://discord.gg/" target="_blank" rel="noopener noreferrer">Join the Discord <span aria-hidden="true">↗</span></a>
+    <small>© <span id="current-year"></span> V-Client · VSMP. Minecraft is a trademark of Mojang Studios.</small>
+  </footer>
+</body>
+</html>

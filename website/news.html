@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b16">
+  <meta name="description" content="V-Client launcher updates and VSMP server announcements.">
+  <title>News — V-Client</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./script.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="V-Client home">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M9 9h30v30H9z" fill="#e7bf68"/><path d="M15 16h6l3 10 3-10h6l-6.2 17h-5.6z" fill="#101321"/><path d="M34 8h6v6h-6z" fill="#fff0bd"/></svg>
+      <span>V<span class="brand-light">-CLIENT</span></span>
+    </a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
+      <span class="sr-only">Toggle navigation</span><span></span><span></span><span></span>
+    </button>
+    <nav class="site-nav" id="site-nav" aria-label="Main navigation">
+      <a href="index.html">Home</a>
+      <a href="downloads.html">Downloads</a>
+      <a href="features.html">Features</a>
+      <a href="news.html">News</a>
+      <a class="nav-discord discord-link" href="https://discord.gg/" target="_blank" rel="noopener noreferrer">Discord ↗</a>
+    </nav>
+  </header>
+
+  <div id="announcement-banner" class="announcement-banner" role="status" hidden></div>
+
+  <main class="section-wrap page-main">
+    <div class="section-heading">
+      <p class="eyebrow">STAY IN THE LOOP</p>
+      <h1 class="page-title">News<span>.</span></h1>
+      <p>Launcher updates and server announcements. The same feed appears inside V-Client on Windows and Android.</p>
+    </div>
+    <div class="filter-row" role="group" aria-label="Filter news">
+      <button type="button" class="filter-chip" data-news-filter="" aria-pressed="true">All</button>
+      <button type="button" class="filter-chip" data-news-filter="launcher" aria-pressed="false">Launcher</button>
+      <button type="button" class="filter-chip" data-news-filter="server" aria-pressed="false">Server</button>
+    </div>
+    <div id="news-list" class="news-list" data-limit="50"><p class="empty-state">Loading news…</p></div>
+  </main>
+
+  <footer class="site-footer section-wrap">
+    <a class="brand footer-brand" href="index.html">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M9 9h30v30H9z" fill="#e7bf68"/><path d="M15 16h6l3 10 3-10h6l-6.2 17h-5.6z" fill="#101321"/><path d="M34 8h6v6h-6z" fill="#fff0bd"/></svg>
+      <span>V<span class="brand-light">-CLIENT</span></span>
+    </a>
+    <p>Built for your next adventure.</p>
+    <a class="footer-discord discord-link" href="https://discord.gg/" target="_blank" rel="noopener noreferrer">Join the Discord <span aria-hidden="true">↗</span></a>
+    <small>© <span id="current-year"></span> V-Client · VSMP. Minecraft is a trademark of Mojang Studios.</small>
+  </footer>
+</body>
+</html>
