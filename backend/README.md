@@ -1,6 +1,6 @@
 # V-Client backend
 
-One small Node.js service that powers the website, the admin panel, the Windows launcher and the Android app. No database server to install: data lives in a SQLite file.
+One small Node.js service that powers the website, the Windows launcher and the Android app. No database server to install: data lives in a SQLite file.
 
 - Node.js **22.13+** (uses the built-in `node:sqlite`; you may see an "experimental" warning on startup, which is expected)
 - One dependency: `express`
@@ -57,13 +57,32 @@ Public (no sign-in):
 
 Accounts (`Authorization: Bearer <token>`): `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `PUT /api/auth/profile`, `PUT /api/auth/password`. Passwords are hashed with scrypt; auth endpoints are rate limited.
 
-Admin (admin role only): `GET/POST/PUT/DELETE /api/admin/news`, `/api/admin/announcements`, `/api/admin/releases` (+ `PUT /api/admin/releases/:id/file?ext=.apk` with the raw installer as the body), `GET /api/admin/users`, `GET /api/admin/stats`.
+Management API (admin role only; there is no web panel, use curl or any HTTP client): `GET/POST/PUT/DELETE /api/admin/news`, `/api/admin/announcements`, `/api/admin/releases` (+ `PUT /api/admin/releases/:id/file?ext=.apk` with the raw installer as the body), `GET /api/admin/users`, `GET /api/admin/stats`.
 
 ## Publishing an update
 
-1. Admin panel → **Updates** → *New launcher release*: platform, version (`1.2.0`), notes. Tick *Mandatory*, or set *Minimum supported version*, to force older versions to update.
-2. **Upload installer** (`.exe`/`.msi`/`.zip` for Windows, `.apk` for Android). The server stores it, records the size and SHA-256, and the apps verify both before installing.
-3. **Publish.** Apps see it on their next launch. **Unpublish** or **Delete** to withdraw it.
+```bash
+B=https://vsmp-client.onrender.com
+TOKEN=$(curl -s -X POST $B/api/auth/login -H "Content-Type: application/json" \
+  -d '{"login":"admin","password":"YOUR_ADMIN_PASSWORD"}' | node -pe 'JSON.parse(require("fs").readFileSync(0)).token')
+AUTH="Authorization: Bearer $TOKEN"
+
+# 1. create the release (platform windows|android; optional mandatory / minSupported force older versions to update)
+ID=$(curl -s -X POST $B/api/admin/releases -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{"platform":"android","version":"1.2.0","notes":"What is new"}' | node -pe 'JSON.parse(require("fs").readFileSync(0)).id')
+
+# 2. upload the installer (.exe/.msi/.zip for windows, .apk for android); size + SHA-256 are recorded
+curl -X PUT "$B/api/admin/releases/$ID/file?ext=.apk" -H "$AUTH" -H "Content-Type: application/octet-stream" --data-binary @app-release.apk
+
+# 3. publish (apps see it on next launch); use {"published":false} to withdraw
+curl -X PUT $B/api/admin/releases/$ID -H "$AUTH" -H "Content-Type: application/json" -d '{"published":true}'
+
+# news / announcements
+curl -X POST $B/api/admin/news -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{"title":"Hello","body":"Text","category":"server"}'
+curl -X POST $B/api/admin/announcements -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{"message":"Maintenance tonight","level":"warning"}'
+```
 
 ## Privacy
 

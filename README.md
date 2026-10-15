@@ -1,14 +1,14 @@
 # V-Client
 
-V-Client is the launcher ecosystem for the **VSMP** Minecraft server: a Windows desktop launcher, an Android app, one shared backend, and a download website with an admin panel.
+V-Client is the launcher ecosystem for the **VSMP** Minecraft server: a Windows desktop launcher, an Android app, one shared backend, and a download website.
 
 ```
 V-client/
 ├── src/ , pom.xml , package-release.ps1   Windows launcher (Java 21 + JavaFX) → V-Client.exe
 ├── mod/                                   In-game Fabric mod bundled with the Windows launcher
 ├── android/                               Android app (Kotlin + Jetpack Compose, Material 3) → .apk
-├── backend/                               Shared REST API + admin API + download host (Node.js, SQLite)
-├── website/                               Download site (home, downloads, features, news) + /admin panel
+├── backend/                               Shared REST API + management API + download host (Node.js, SQLite)
+├── website/                               Download site (home, downloads, features, news)
 └── tools/                                 Windows setup-exe packaging
 ```
 
@@ -17,7 +17,7 @@ V-client/
 | Windows launcher | Play / one-click **JOIN OUR SMP**, version selector, Ely.by / Microsoft / offline accounts, RAM + Java settings, **News** page, **Error logs** page, live VSMP status, automatic updates |
 | Android app | **PLAY VSMP** (opens Minecraft Bedrock and connects), server status + player count, news, V-Client account, Discord/website buttons, in-app updates |
 | Backend | One API for both apps and the site: accounts, news, announcements, launcher version checks and installer hosting, VSMP status (Java + Bedrock ping), anonymous usage statistics |
-| Website + admin | Download buttons for `.exe` and `.apk`, features, news; admin panel to post news, manage announcements, upload/publish launcher updates, view statistics |
+| Website | Download buttons for `.exe` and `.apk`, features, VSMP status, news |
 
 ## Quick start (everything on your own PC)
 
@@ -28,9 +28,9 @@ V-client/
    copy .env.example .env      # optional: edit ports, VSMP addresses, Discord link
    npm start
    ```
-   On first start it prints a generated admin password once (or uses `ADMIN_PASSWORD` from `.env`). Open <http://localhost:8080> for the site and <http://localhost:8080/admin/> for the admin panel.
+   On first start it prints a generated admin password once (or uses `ADMIN_PASSWORD` from `.env`). Open <http://localhost:8080> for the site.
 2. **Point the apps at it.** Windows: open **News** → *Backend & updates* and save the address. Android: **Settings → Backend**. Or bake the address into a release build (see below).
-3. **Publish a launcher update** (Admin → Updates): create a release for `windows` or `android`, upload the installer, press Publish. Apps with a lower version are offered the update; set *Minimum supported version* or *Mandatory* to force it.
+3. **Publish news or a launcher update** with the management API (curl examples in [backend/README.md](backend/README.md)): create a release for `windows` or `android`, upload the installer, publish it. Apps with a lower version are offered the update; set *Minimum supported version* or *Mandatory* to force it.
 
 Full backend reference, deployment notes and the API list: [backend/README.md](backend/README.md). Android details: [android/README.md](android/README.md).
 
@@ -43,9 +43,9 @@ Requirements: Windows, 64-bit **Azul Zulu JDK 21** with `JAVA_HOME` set, Maven o
 .\package-release.ps1
 ```
 
-Output: `Release\V-Client.exe` (+ `Release\app`, `Release\runtime`) and `AzyrClient.zip`. To produce the single-file setup installer used by the website and the auto-updater, run `tools\package-standalone-installer.ps1`, then upload the resulting setup `.exe` in the admin panel as the Windows release. Run the launcher from source with `mvn javafx:run`, and the tests with `mvn test`.
+Output: `Release\V-Client.exe` (+ `Release\app`, `Release\runtime`) and `AzyrClient.zip`. To produce the single-file setup installer used by the website and the auto-updater, run `tools\package-standalone-installer.ps1`, then upload the resulting setup `.exe` as the Windows release (see backend/README.md). Run the launcher from source with `mvn javafx:run`, and the tests with `mvn test`.
 
-Before publishing a new Windows build, raise `AppInfo.VERSION` in [AppInfo.java](src/main/java/com/vclient/AppInfo.java) and publish the same version number in the admin panel; the updater compares them.
+Before publishing a new Windows build, raise `AppInfo.VERSION` in [AppInfo.java](src/main/java/com/vclient/AppInfo.java) and publish the same version number through the API; the updater compares them.
 
 ## Build the Android APK (.apk)
 
@@ -63,7 +63,7 @@ Release builds must be signed to be installable: create `android/keystore.proper
 
 - **Branding:** the same midnight-navy + gold palette and V logo on the site, Windows launcher and Android app.
 - **Accounts:** one V-Client account (username/email + password) works in both apps and on the site; it can link a Minecraft and an Ely.by name. Game logins (Microsoft, Ely.by, offline) remain Windows-launcher features.
-- **News + announcements:** posted once in the admin panel, shown in both apps and on the site.
+- **News + announcements:** posted once through the API, shown in both apps and on the site.
 - **Updates:** both apps call `GET /api/launcher/update?platform=…&current=…`; downloads are verified against the SHA-256 the backend stores.
 - **Server status:** the backend pings VSMP (Java Server List Ping and Bedrock RakNet) and caches the result for 20 s, so thousands of launchers cost the game server one ping.
 

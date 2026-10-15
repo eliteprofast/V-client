@@ -42,7 +42,7 @@ function createApp(config, options = {}) {
   app.use('/api/admin', adminRoutes(ctx));
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
-  // Website, admin panel and installers.
+  // Website and installers.
   app.use('/downloads', publicRoutes.downloads(ctx));
   app.get('/download/:platform', publicRoutes.latestDownload(ctx));
   app.use(express.static(config.websiteDir, { extensions: ['html'], index: 'index.html', maxAge: '5m' }));

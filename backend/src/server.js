@@ -7,7 +7,6 @@ const app = createApp(config);
 
 const server = app.listen(config.port, () => {
   console.log(`[V-Client] API + website listening on http://localhost:${config.port}`);
-  console.log(`[V-Client] Admin panel: http://localhost:${config.port}/admin/`);
   console.log(`[V-Client] Data directory: ${config.dataDir}`);
 });
 

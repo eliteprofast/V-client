@@ -43,7 +43,7 @@ Then `.\gradlew.bat assembleRelease` produces a signed `app\build\outputs\apk\re
 
 ### Publishing
 
-Raise `versionCode` and `versionName` in `app/build.gradle.kts`, build the signed APK, and upload it in the admin panel (**Updates**, platform `android`, the same version string as `versionName`). Phones on an older version are offered the update at next launch.
+Raise `versionCode` and `versionName` in `app/build.gradle.kts`, build the signed APK, and upload it through the management API (see backend/README.md; platform `android`, the same version string as `versionName`). Phones on an older version are offered the update at next launch.
 
 ## Layout
 
