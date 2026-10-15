@@ -45,8 +45,14 @@ fun ServersPanel(viewModel: MainViewModel, onMessage: (String?, Boolean) -> Unit
         }
     }
 
+    var showJavaHelp by remember { mutableStateOf(false) }
     Panel {
         SectionLabel("Minecraft")
+        Text(
+            "Real: Bedrock Edition from the Play Store, signed in with your Microsoft account.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Button(
             onClick = {
                 if (Minecraft.launchApp(context, Minecraft.PACKAGE)) onMessage(null, false)
@@ -56,19 +62,18 @@ fun ServersPanel(viewModel: MainViewModel, onMessage: (String?, Boolean) -> Unit
         ) { Text("Launch Minecraft (Bedrock)") }
 
         val javaLauncher = Minecraft.JAVA_LAUNCHERS.firstOrNull { Minecraft.isInstalled(context, it.first) }
+        Text(
+            "Offline: Java Edition through PojavLauncher or MojoLauncher, which support offline (local) accounts and Fabric mods.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         OutlinedButton(
-            onClick = { javaLauncher?.let { Minecraft.launchApp(context, it.first) } },
-            enabled = javaLauncher != null,
+            onClick = { if (javaLauncher != null) Minecraft.launchApp(context, javaLauncher.first) else showJavaHelp = true },
             modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (javaLauncher != null) "Open ${javaLauncher.second} (Java Edition)" else "Java Edition: no Android Java launcher installed") }
-        if (javaLauncher == null) {
-            Text(
-                "Java Edition doesn't run natively on Android. Install PojavLauncher or MojoLauncher and V-Client will open it from here.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        ) { Text(if (javaLauncher != null) "Open ${javaLauncher.second} (Java Edition)" else "Set up Java Edition (offline)") }
+        if (javaLauncher != null) TextButton(onClick = { showJavaHelp = true }) { Text("How to set it up") }
     }
+    if (showJavaHelp) JavaHelpDialog(context) { showJavaHelp = false }
 
     Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -86,6 +91,30 @@ fun ServersPanel(viewModel: MainViewModel, onMessage: (String?, Boolean) -> Unit
     }
 
     if (adding) AddServerDialog(viewModel) { adding = false }
+}
+
+@Composable
+private fun JavaHelpDialog(context: android.content.Context, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Java Edition on Android") },
+        text = {
+            Text(
+                "Java Edition can't run inside V-Client, so it runs through a community launcher:\n\n" +
+                    "1. Install PojavLauncher (or MojoLauncher).\n" +
+                    "2. Add an account: a Microsoft account for the real game, or a local account for offline play.\n" +
+                    "3. Install a version (for example 1.21.11), optionally with Fabric to use mods.\n" +
+                    "4. Press play. Next time V-Client opens it for you from this screen.\n\n" +
+                    "Offline accounts only work on offline-mode servers and singleplayer.",
+            )
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Got it") } },
+        dismissButton = {
+            TextButton(onClick = {
+                Minecraft.openWebLink(context, "https://github.com/PojavLauncherTeam/PojavLauncher")
+            }) { Text("Get PojavLauncher") }
+        },
+    )
 }
 
 @Composable
