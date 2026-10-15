@@ -16,7 +16,7 @@ public abstract class LightmapTextureManagerMixin {
     private Object vclient$gamma(SimpleOption<?> option) {
         Object value = option.getValue();
         if (VClientMod.fullbright() && option == MinecraftClient.getInstance().options.getGamma()) {
-            return 15.0;
+            return VClientMod.fullbrightGamma();
         }
         return value;
     }

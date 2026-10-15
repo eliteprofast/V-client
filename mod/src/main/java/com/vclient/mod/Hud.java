@@ -5,12 +5,19 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.PlayerListEntry;
+import net.minecraft.client.network.ServerInfo;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 /** Draws the movable HUD elements and tracks clicks per second. */
 public final class Hud {
@@ -20,12 +27,13 @@ public final class Hud {
     static final int MUTED = 0xFFB3B3CF;
     private static final int KEY = 22;
     private static final int GAP = 2;
+    private static final int LINE = 12;
     // Looked up by serialized name: enum constant names are obfuscated in the running game.
     private static final EquipmentSlot[] ARMOR_SLOTS = {EquipmentSlot.byName("head"),
             EquipmentSlot.byName("chest"), EquipmentSlot.byName("legs"), EquipmentSlot.byName("feet")};
-
-    private static final Module[] LEFT_COLUMN = {Module.FPS, Module.CPS, Module.PING, Module.COORDINATES,
-            Module.KEYSTROKES};
+    private static final Module[] LEFT_COLUMN = {Module.FPS, Module.CPS, Module.PING, Module.SPEED, Module.CLOCK,
+            Module.MEMORY, Module.DAY_COUNTER, Module.SERVER_ADDRESS, Module.COORDINATES, Module.KEYSTROKES};
+    private static final String[] ROMAN = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
 
     private static final ArrayDeque<Long> LEFT_CLICKS = new ArrayDeque<>();
     private static final ArrayDeque<Long> RIGHT_CLICKS = new ArrayDeque<>();
@@ -40,8 +48,7 @@ public final class Hud {
         trackClicks(client);
         if (client.currentScreen instanceof HudEditorScreen) return;
         for (Module module : Module.values()) {
-            if (!module.hudElement() || !VConfig.enabled(module)) continue;
-            if (!visible(client, module)) continue;
+            if (!module.hudElement() || !VConfig.enabled(module) || !visible(client, module)) continue;
             int[] bounds = bounds(client, module);
             draw(context, client, module, bounds[0], bounds[1], false);
         }
@@ -49,111 +56,210 @@ public final class Hud {
 
     /** Elements that only appear while relevant (the editor shows them all). */
     private static boolean visible(MinecraftClient client, Module module) {
-        if (module == Module.TOGGLE_SPRINT) return client.options.sprintKey.isPressed();
-        return true;
-    }
-
-    static int width(MinecraftClient client, Module module) {
-        TextRenderer font = client.textRenderer;
         return switch (module) {
-            case FPS -> font.getWidth("FPS: 9999") + 8;
-            case CPS -> font.getWidth("CPS: 99 | 99") + 8;
-            case COORDINATES -> Math.max(font.getWidth("XYZ: " + coordinateText(client.player)),
-                    font.getWidth("Facing: southeast")) + 8;
-            case PING -> font.getWidth("Ping: 9999 ms") + 8;
-            case KEYSTROKES -> KEY * 3 + GAP * 2;
-            case ARMOR_STATUS -> 16 + 4 + font.getWidth("9999") + 4;
-            case TOGGLE_SPRINT -> font.getWidth("[Sprinting (Toggled)]") + 8;
-            default -> 0;
+            case TOGGLE_SPRINT -> client.options.sprintKey.isPressed();
+            case POTION_EFFECTS -> client.player != null && !client.player.getStatusEffects().isEmpty();
+            default -> true;
         };
     }
 
-    static int height(MinecraftClient client, Module module) {
+    private static float scale(Module module) {
+        return (float) (VConfig.get(module, CommonSettings.SCALE) / 100.0);
+    }
+
+    /** Unscaled width of an element. */
+    private static int width(MinecraftClient client, Module module, boolean editing) {
+        TextRenderer font = client.textRenderer;
         return switch (module) {
-            case COORDINATES -> 26;
-            case KEYSTROKES -> KEY * 3 + GAP * 3 + 12;
-            case ARMOR_STATUS -> 5 * 17;
+            case KEYSTROKES -> KEY * 3 + GAP * 2;
+            case ARMOR_STATUS -> 16 + (VConfig.bool(module, "numbers") ? 4 + font.getWidth("9999") : 0) + 4;
+            case COORDINATES -> {
+                int widest = font.getWidth("XYZ: " + coordinateText(client.player));
+                if (VConfig.bool(module, "facing")) widest = Math.max(widest, font.getWidth("Facing: southeast"));
+                yield widest + 8;
+            }
+            case POTION_EFFECTS -> {
+                int widest = 0;
+                for (String line : effectLines(client, editing)) widest = Math.max(widest, font.getWidth(line));
+                yield widest + 8;
+            }
+            default -> {
+                String[] text = text(client, module);
+                yield font.getWidth(text[0] + text[1]) + 8;
+            }
+        };
+    }
+
+    /** Unscaled height of an element. */
+    private static int height(MinecraftClient client, Module module, boolean editing) {
+        return switch (module) {
+            case COORDINATES -> VConfig.bool(module, "facing") ? 26 : 13;
+            case KEYSTROKES -> {
+                int rows = KEY * 2 + GAP;
+                if (VConfig.bool(module, "mouse")) rows += GAP + KEY;
+                if (VConfig.bool(module, "space")) rows += GAP + 12;
+                yield rows;
+            }
+            case ARMOR_STATUS -> (VConfig.bool(module, "held") ? 5 : 4) * 17;
+            case POTION_EFFECTS -> Math.max(1, effectLines(client, editing).size()) * LINE + 2;
             default -> 13;
         };
     }
 
-    /** Current top-left corner, width, and height, kept inside the screen. */
+    /** Current top-left corner and scaled size, kept inside the screen. */
     static int[] bounds(MinecraftClient client, Module module) {
+        return bounds(client, module, client.currentScreen instanceof HudEditorScreen);
+    }
+
+    private static int[] bounds(MinecraftClient client, Module module, boolean editing) {
         int screenWidth = client.getWindow().getScaledWidth();
         int screenHeight = client.getWindow().getScaledHeight();
-        int width = width(client, module);
-        int height = height(client, module);
+        float scale = scale(module);
+        int width = Math.round(width(client, module, editing) * scale);
+        int height = Math.round(height(client, module, editing) * scale);
         int[] saved = VConfig.position(module);
-        int x;
-        int y;
-        if (saved != null) {
-            x = saved[0];
-            y = saved[1];
-        } else {
-            int[] fallback = defaultPosition(client, module, screenWidth, screenHeight, width);
-            x = fallback[0];
-            y = fallback[1];
-        }
-        x = Math.clamp(x, 0, Math.max(0, screenWidth - width));
-        y = Math.clamp(y, 0, Math.max(0, screenHeight - height));
+        int[] position = saved != null ? saved
+                : defaultPosition(client, module, screenWidth, screenHeight, width, editing);
+        int x = Math.clamp(position[0], 0, Math.max(0, screenWidth - width));
+        int y = Math.clamp(position[1], 0, Math.max(0, screenHeight - height));
         return new int[]{x, y, width, height};
     }
 
     private static int[] defaultPosition(MinecraftClient client, Module module, int screenWidth,
-                                         int screenHeight, int width) {
+                                         int screenHeight, int width, boolean editing) {
         return switch (module) {
             case ARMOR_STATUS -> new int[]{screenWidth - width - 4, screenHeight / 2 - 42};
-            case TOGGLE_SPRINT -> new int[]{4, screenHeight - 17};
-            default -> new int[]{4, leftColumnY(client, module)};
+            case POTION_EFFECTS -> new int[]{screenWidth - width - 4, 4};
+            case TOGGLE_SPRINT -> new int[]{4, screenHeight - Math.round(17 * scale(module))};
+            default -> new int[]{4, leftColumnY(client, module, editing)};
         };
     }
 
     /** Stacks the left-column elements that still use default positions, with no gaps. */
-    private static int leftColumnY(MinecraftClient client, Module target) {
+    private static int leftColumnY(MinecraftClient client, Module target, boolean editing) {
         int y = 4;
         for (Module module : LEFT_COLUMN) {
             if (module == target) return y;
-            if (VConfig.enabled(module) && VConfig.position(module) == null) y += height(client, module) + 3;
+            if (VConfig.enabled(module) && VConfig.position(module) == null) {
+                y += Math.round(height(client, module, editing) * scale(module)) + 3;
+            }
         }
         return y;
     }
 
     static void draw(DrawContext context, MinecraftClient client, Module module, int x, int y, boolean editing) {
+        float scale = scale(module);
+        context.getMatrices().pushMatrix();
+        context.getMatrices().translate(x, y);
+        context.getMatrices().scale(scale, scale);
+        try {
+            drawLocal(context, client, module, editing);
+        } finally {
+            context.getMatrices().popMatrix();
+        }
+    }
+
+    private static void drawLocal(DrawContext context, MinecraftClient client, Module module, boolean editing) {
         TextRenderer font = client.textRenderer;
-        int width = width(client, module);
+        int width = width(client, module, editing);
+        int height = height(client, module, editing);
+        int label = CommonSettings.COLORS[VConfig.integer(module, CommonSettings.LABEL_COLOR.id())];
+        boolean background = VConfig.get(module, CommonSettings.BACKGROUND) >= 0.5;
         switch (module) {
-            case FPS -> label(context, font, x, y, width, "FPS: ", Integer.toString(client.getCurrentFps()));
-            case CPS -> label(context, font, x, y, width, "CPS: ", count(LEFT_CLICKS) + " | " + count(RIGHT_CLICKS));
-            case PING -> label(context, font, x, y, width, "Ping: ", ping(client));
-            case COORDINATES -> coordinates(context, font, client.player, x, y, width);
-            case KEYSTROKES -> keystrokes(context, client, x, y);
-            case ARMOR_STATUS -> armor(context, client, x, y, editing);
-            case TOGGLE_SPRINT -> {
-                context.fill(x, y, x + width, y + 13, PANEL);
-                context.drawText(font, "[Sprinting (Toggled)]", x + 4, y + 3, ACCENT, true);
+            case KEYSTROKES -> keystrokes(context, client, background);
+            case ARMOR_STATUS -> armor(context, client, editing);
+            case COORDINATES -> {
+                if (background) context.fill(0, 0, width, height, PANEL);
+                context.drawText(font, "XYZ: ", 4, 3, label, true);
+                context.drawText(font, coordinateText(client.player), 4 + font.getWidth("XYZ: "), 3, TEXT, true);
+                if (VConfig.bool(module, "facing")) {
+                    String facing = client.player == null ? "north" : client.player.getHorizontalFacing().asString();
+                    context.drawText(font, "Facing: ", 4, 15, label, true);
+                    context.drawText(font, facing, 4 + font.getWidth("Facing: "), 15, TEXT, true);
+                }
+            }
+            case POTION_EFFECTS -> {
+                if (background) context.fill(0, 0, width, height, PANEL);
+                int line = 0;
+                for (String text : effectLines(client, editing)) {
+                    context.drawText(font, text, 4, 3 + line * LINE, line % 2 == 0 ? label : TEXT, true);
+                    line++;
+                }
             }
             default -> {
+                String[] text = text(client, module);
+                if (background) context.fill(0, 0, width, height, PANEL);
+                context.drawText(font, text[0], 4, 3, label, true);
+                context.drawText(font, text[1], 4 + font.getWidth(text[0]), 3, TEXT, true);
             }
         }
     }
 
-    private static void label(DrawContext context, TextRenderer font, int x, int y, int width,
-                              String name, String value) {
-        context.fill(x, y, x + width, y + 13, PANEL);
-        context.drawText(font, name, x + 4, y + 3, ACCENT, true);
-        context.drawText(font, value, x + 4 + font.getWidth(name), y + 3, TEXT, true);
+    /** Label and value for the single-line elements. */
+    private static String[] text(MinecraftClient client, Module module) {
+        return switch (module) {
+            case FPS -> new String[]{"FPS: ", Integer.toString(client.getCurrentFps())};
+            case CPS -> new String[]{"CPS: ", VConfig.bool(module, "rightClicks")
+                    ? count(LEFT_CLICKS) + " | " + count(RIGHT_CLICKS) : Integer.toString(count(LEFT_CLICKS))};
+            case PING -> new String[]{"Ping: ", ping(client)};
+            case SPEED -> {
+                double blocksPerSecond = VClientMod.speed();
+                yield VConfig.integer(module, "unit") == 1
+                        ? new String[]{"Speed: ", String.format(Locale.ROOT, "%.1f km/h", blocksPerSecond * 3.6)}
+                        : new String[]{"Speed: ", String.format(Locale.ROOT, "%.2f b/s", blocksPerSecond)};
+            }
+            case CLOCK -> new String[]{"Time: ", clock(module)};
+            case MEMORY -> new String[]{"Memory: ", memory()};
+            case DAY_COUNTER -> new String[]{"Day: ", client.world == null ? "0"
+                    : Long.toString(client.world.getTimeOfDay() / 24000L)};
+            case SERVER_ADDRESS -> new String[]{"Server: ", server(client)};
+            case TOGGLE_SPRINT -> new String[]{"[Sprinting (Toggled)]", ""};
+            default -> new String[]{"", ""};
+        };
     }
 
-    private static void coordinates(DrawContext context, TextRenderer font, ClientPlayerEntity player,
-                                    int x, int y, int width) {
-        context.fill(x, y, x + width, y + 26, PANEL);
-        String xyz = coordinateText(player);
-        String facing = player == null ? "north"
-                : player.getHorizontalFacing().asString();
-        context.drawText(font, "XYZ: ", x + 4, y + 3, ACCENT, true);
-        context.drawText(font, xyz, x + 4 + font.getWidth("XYZ: "), y + 3, TEXT, true);
-        context.drawText(font, "Facing: ", x + 4, y + 15, ACCENT, true);
-        context.drawText(font, facing, x + 4 + font.getWidth("Facing: "), y + 15, TEXT, true);
+    private static String clock(Module module) {
+        boolean twentyFour = VConfig.bool(module, "twentyFour");
+        boolean seconds = VConfig.bool(module, "seconds");
+        String pattern = (twentyFour ? "HH:mm" : "h:mm") + (seconds ? ":ss" : "") + (twentyFour ? "" : " a");
+        return LocalTime.now().format(DateTimeFormatter.ofPattern(pattern, Locale.ROOT));
+    }
+
+    private static String memory() {
+        Runtime runtime = Runtime.getRuntime();
+        long used = runtime.totalMemory() - runtime.freeMemory();
+        long max = runtime.maxMemory();
+        return String.format(Locale.ROOT, "%d%% %.1f/%.1f GB", used * 100 / Math.max(1, max),
+                used / 1073741824.0, max / 1073741824.0);
+    }
+
+    private static String server(MinecraftClient client) {
+        if (client.isInSingleplayer()) return "Singleplayer";
+        ServerInfo server = client.getCurrentServerEntry();
+        return server == null ? "Not connected" : server.address;
+    }
+
+    private static List<String> effectLines(MinecraftClient client, boolean editing) {
+        List<String> lines = new ArrayList<>();
+        boolean level = VConfig.bool(Module.POTION_EFFECTS, "level");
+        if (client.player != null) {
+            for (StatusEffectInstance effect : client.player.getStatusEffects()) {
+                String name = effect.getEffectType().comp_349().getName().getString();
+                int amplifier = effect.getAmplifier();
+                if (level && amplifier > 0) {
+                    name += " " + (amplifier < ROMAN.length ? ROMAN[amplifier] : Integer.toString(amplifier + 1));
+                }
+                lines.add(name + "  " + duration(effect));
+            }
+        }
+        if (lines.isEmpty() && editing) lines.add("Speed" + (level ? " II" : "") + "  1:30");
+        return lines;
+    }
+
+    private static String duration(StatusEffectInstance effect) {
+        if (effect.isInfinite()) return "**:**";
+        int seconds = effect.getDuration() / 20;
+        return seconds / 60 + ":" + String.format(Locale.ROOT, "%02d", seconds % 60);
     }
 
     private static String coordinateText(ClientPlayerEntity player) {
@@ -167,25 +273,31 @@ public final class Hud {
         return (entry == null ? 0 : entry.getLatency()) + " ms";
     }
 
-    private static void keystrokes(DrawContext context, MinecraftClient client, int x, int y) {
+    private static void keystrokes(DrawContext context, MinecraftClient client, boolean background) {
         TextRenderer font = client.textRenderer;
-        key(context, font, x + KEY + GAP, y, KEY, KEY, "W", client.options.forwardKey);
-        int row = y + KEY + GAP;
-        key(context, font, x, row, KEY, KEY, "A", client.options.leftKey);
-        key(context, font, x + KEY + GAP, row, KEY, KEY, "S", client.options.backKey);
-        key(context, font, x + (KEY + GAP) * 2, row, KEY, KEY, "D", client.options.rightKey);
-        int mouseRow = row + KEY + GAP;
-        int mouseWidth = (KEY * 3 + GAP) / 2;
-        key(context, font, x, mouseRow, mouseWidth, KEY, "LMB", client.options.attackKey);
-        key(context, font, x + mouseWidth + GAP, mouseRow, KEY * 3 + GAP * 2 - mouseWidth - GAP, KEY,
-                "RMB", client.options.useKey);
-        key(context, font, x, mouseRow + KEY + GAP, KEY * 3 + GAP * 2, 12, "", client.options.jumpKey);
+        key(context, font, KEY + GAP, 0, KEY, KEY, "W", client.options.forwardKey, background);
+        int row = KEY + GAP;
+        key(context, font, 0, row, KEY, KEY, "A", client.options.leftKey, background);
+        key(context, font, KEY + GAP, row, KEY, KEY, "S", client.options.backKey, background);
+        key(context, font, (KEY + GAP) * 2, row, KEY, KEY, "D", client.options.rightKey, background);
+        row += KEY + GAP;
+        int fullWidth = KEY * 3 + GAP * 2;
+        if (VConfig.bool(Module.KEYSTROKES, "mouse")) {
+            int mouseWidth = (KEY * 3 + GAP) / 2;
+            key(context, font, 0, row, mouseWidth, KEY, "LMB", client.options.attackKey, background);
+            key(context, font, mouseWidth + GAP, row, fullWidth - mouseWidth - GAP, KEY, "RMB",
+                    client.options.useKey, background);
+            row += KEY + GAP;
+        }
+        if (VConfig.bool(Module.KEYSTROKES, "space")) {
+            key(context, font, 0, row, fullWidth, 12, "", client.options.jumpKey, background);
+        }
     }
 
     private static void key(DrawContext context, TextRenderer font, int x, int y, int width, int height,
-                            String text, KeyBinding binding) {
+                            String text, KeyBinding binding, boolean background) {
         boolean pressed = binding.isPressed();
-        context.fill(x, y, x + width, y + height, pressed ? 0xD0FFFFFF : PANEL);
+        if (pressed || background) context.fill(x, y, x + width, y + height, pressed ? 0xD0FFFFFF : PANEL);
         if (text.isEmpty()) {
             int barY = y + height / 2;
             context.fill(x + width / 4, barY, x + width * 3 / 4, barY + 1, pressed ? 0xFF000000 : TEXT);
@@ -195,33 +307,37 @@ public final class Hud {
                 pressed ? 0xFF000000 : TEXT, !pressed);
     }
 
-    private static void armor(DrawContext context, MinecraftClient client, int x, int y, boolean editing) {
+    private static void armor(DrawContext context, MinecraftClient client, boolean editing) {
         ClientPlayerEntity player = client.player;
+        boolean numbers = VConfig.bool(Module.ARMOR_STATUS, "numbers");
         int row = 0;
         for (EquipmentSlot slot : ARMOR_SLOTS) {
             ItemStack stack = player == null ? ItemStack.EMPTY : player.getEquippedStack(slot);
-            armorRow(context, client.textRenderer, stack, x, y + row * 17, editing);
+            armorRow(context, client.textRenderer, stack, row * 17, editing, numbers);
             row++;
         }
-        armorRow(context, client.textRenderer, player == null ? ItemStack.EMPTY : player.getMainHandStack(),
-                x, y + row * 17, editing);
+        if (VConfig.bool(Module.ARMOR_STATUS, "held")) {
+            armorRow(context, client.textRenderer, player == null ? ItemStack.EMPTY : player.getMainHandStack(),
+                    row * 17, editing, numbers);
+        }
     }
 
-    private static void armorRow(DrawContext context, TextRenderer font, ItemStack stack, int x, int y,
-                                 boolean editing) {
+    private static void armorRow(DrawContext context, TextRenderer font, ItemStack stack, int y, boolean editing,
+                                 boolean numbers) {
         if (stack.isEmpty()) {
-            if (editing) context.fill(x, y, x + 16, y + 16, 0x40FFFFFF);
+            if (editing) context.fill(0, y, 16, y + 16, 0x40FFFFFF);
             return;
         }
-        context.drawItem(stack, x, y);
-        context.drawStackOverlay(font, stack, x, y);
+        context.drawItem(stack, 0, y);
+        context.drawStackOverlay(font, stack, 0, y);
+        if (!numbers) return;
         if (stack.isDamageable()) {
             int remaining = stack.getMaxDamage() - stack.getDamage();
             float fraction = remaining / (float) Math.max(1, stack.getMaxDamage());
             int color = fraction > 0.5f ? 0xFF7CF29A : fraction > 0.2f ? ACCENT : 0xFFFF6B6B;
-            context.drawText(font, Integer.toString(remaining), x + 20, y + 4, color, true);
+            context.drawText(font, Integer.toString(remaining), 20, y + 4, color, true);
         } else if (stack.getCount() > 1) {
-            context.drawText(font, Integer.toString(stack.getCount()), x + 20, y + 4, TEXT, true);
+            context.drawText(font, Integer.toString(stack.getCount()), 20, y + 4, TEXT, true);
         }
     }
 

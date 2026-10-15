@@ -77,12 +77,13 @@ public final class NightSky {
         for (int index = 0; index < STAR_COUNT; index++) {
             int x = (int) (((STAR_X[index] + time * STAR_DRIFT[index]) % 1.0) * width);
             int y = (int) (STAR_Y[index] * height);
-            double twinkle = 0.42 + 0.58 * (0.5 + 0.5 * Math.sin(time * 1.8 + STAR_PHASE[index]));
+            double twinkle = VConfig.bool(Module.MENU_BACKGROUND, "twinkle")
+                    ? 0.42 + 0.58 * (0.5 + 0.5 * Math.sin(time * 1.8 + STAR_PHASE[index])) : 0.85;
             int size = STAR_SIZE[index] * pixel;
             context.fill(x, y, x + size, y + size, argb(twinkle, 234, 225, 190));
         }
         double cometPhase = (time % 13.0) / 13.0;
-        if (cometPhase < 0.09) {
+        if (cometPhase < 0.09 && VConfig.bool(Module.MENU_BACKGROUND, "comet")) {
             double headX = width * (0.23 + cometPhase * 5.2);
             double headY = height * (0.13 + cometPhase * 1.7);
             int color = argb((0.09 - cometPhase) * 8, 235, 220, 176);

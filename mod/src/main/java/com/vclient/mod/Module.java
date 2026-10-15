@@ -1,29 +1,73 @@
 package com.vclient.mod;
 
-/** Every feature shown in the Right Shift mod menu. */
+import org.lwjgl.glfw.GLFW;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/** Every feature shown in the Right Shift mod menu, with the options on its settings page. */
 public enum Module {
-    MENU_BACKGROUND("Night Sky Menus", "Launcher sky on menus", true, false),
-    FPS("FPS", "Frames per second", true, true),
-    CPS("CPS", "Clicks per second", true, true),
-    COORDINATES("Coordinates", "Position and facing", true, true),
-    PING("Ping", "Server latency", false, true),
-    KEYSTROKES("Keystrokes", "WASD, mouse, jump", true, true),
-    ARMOR_STATUS("Armor Status", "Armor durability", true, true),
-    ZOOM("Zoom", "Hold C to zoom", true, false),
-    FULLBRIGHT("Fullbright", "See in the dark", false, false),
-    TOGGLE_SPRINT("Toggle Sprint", "Tap to keep sprinting", false, true),
-    TOGGLE_SNEAK("Toggle Sneak", "Tap to keep sneaking", false, false);
+    CLIENT("V-Client", "Menu key", true, Kind.ALWAYS_ON,
+            Setting.key("menuKey", "Mod menu key", GLFW.GLFW_KEY_RIGHT_SHIFT)),
+    MENU_BACKGROUND("Night Sky Menus", "Animated menu sky", true, Kind.FEATURE,
+            Setting.toggle("comet", "Shooting comet", true),
+            Setting.toggle("twinkle", "Twinkling stars", true)),
+    FPS("FPS", "Frames per second", true, Kind.HUD),
+    CPS("CPS", "Clicks per second", true, Kind.HUD,
+            Setting.toggle("rightClicks", "Show right clicks", true)),
+    PING("Ping", "Server latency", false, Kind.HUD),
+    COORDINATES("Coordinates", "Position and facing", true, Kind.HUD,
+            Setting.toggle("facing", "Show facing", true)),
+    SPEED("Speed", "Movement speed", false, Kind.HUD,
+            Setting.choice("unit", "Unit", 0, "blocks/s", "km/h")),
+    CLOCK("Clock", "Real-world time", false, Kind.HUD,
+            Setting.toggle("twentyFour", "24-hour time", false),
+            Setting.toggle("seconds", "Show seconds", false)),
+    MEMORY("Memory", "Game RAM usage", false, Kind.HUD),
+    DAY_COUNTER("Day Counter", "In-game day number", false, Kind.HUD),
+    SERVER_ADDRESS("Server Address", "Server IP", false, Kind.HUD),
+    POTION_EFFECTS("Potion Effects", "Effects and timers", true, Kind.HUD,
+            Setting.toggle("level", "Show level", true)),
+    KEYSTROKES("Keystrokes", "WASD, mouse, jump", true, Kind.HUD,
+            Setting.toggle("mouse", "Show mouse buttons", true),
+            Setting.toggle("space", "Show space bar", true)),
+    ARMOR_STATUS("Armor Status", "Armor durability", true, Kind.HUD,
+            Setting.toggle("held", "Show held item", true),
+            Setting.toggle("numbers", "Show durability", true)),
+    ZOOM("Zoom", "Hold key to zoom", true, Kind.FEATURE,
+            Setting.key("key", "Zoom key", GLFW.GLFW_KEY_C),
+            Setting.number("level", "Zoom level", 4, 2, 10, 1, "x"),
+            Setting.toggle("smooth", "Smooth zoom", true),
+            Setting.toggle("cinematic", "Cinematic camera", true),
+            Setting.toggle("scroll", "Scroll to adjust", true)),
+    FULLBRIGHT("Fullbright", "See in the dark", false, Kind.FEATURE,
+            Setting.number("brightness", "Brightness", 15, 2, 15, 1, "x")),
+    NO_HURT_CAM("No Hurt Cam", "No shake when hit", false, Kind.FEATURE),
+    TOGGLE_SPRINT("Toggle Sprint", "Tap to keep sprinting", false, Kind.HUD),
+    TOGGLE_SNEAK("Toggle Sneak", "Tap to keep sneaking", false, Kind.FEATURE);
+
+    private enum Kind { ALWAYS_ON, FEATURE, HUD }
+
 
     private final String title;
     private final String description;
     private final boolean enabledByDefault;
-    private final boolean hudElement;
+    private final Kind kind;
+    private final List<Setting> settings;
 
-    Module(String title, String description, boolean enabledByDefault, boolean hudElement) {
+    Module(String title, String description, boolean enabledByDefault, Kind kind, Setting... own) {
         this.title = title;
         this.description = description;
         this.enabledByDefault = enabledByDefault;
-        this.hudElement = hudElement;
+        this.kind = kind;
+        List<Setting> all = new ArrayList<>(List.of(own));
+        if (kind == Kind.HUD) {
+            all.add(CommonSettings.SCALE);
+            all.add(CommonSettings.BACKGROUND);
+            all.add(CommonSettings.LABEL_COLOR);
+        }
+        if (kind != Kind.ALWAYS_ON) all.add(CommonSettings.TOGGLE_KEY);
+        this.settings = List.copyOf(all);
     }
 
     public String title() {
@@ -40,6 +84,20 @@ public enum Module {
 
     /** Whether the module draws a movable element on the in-game HUD. */
     public boolean hudElement() {
-        return hudElement;
+        return kind == Kind.HUD;
+    }
+
+    /** Whether the module can be switched off (V-Client's own controls cannot). */
+    public boolean toggleable() {
+        return kind != Kind.ALWAYS_ON;
+    }
+
+    public List<Setting> settings() {
+        return settings;
+    }
+
+    public Setting setting(String id) {
+        for (Setting setting : settings) if (setting.id().equals(id)) return setting;
+        throw new IllegalArgumentException(name() + " has no setting " + id);
     }
 }
