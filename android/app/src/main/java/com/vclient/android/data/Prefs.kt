@@ -47,7 +47,24 @@ class Prefs(context: Context) {
                 .toString(),
         ).apply()
 
+    /** Servers the player added; VSMP itself comes from [serverConfig] and is always listed first. */
+    var savedServers: List<SavedServer>
+        get() = runCatching {
+            val array = org.json.JSONArray(store.getString(KEY_SAVED, "[]"))
+            List(array.length()) { i ->
+                val o = array.getJSONObject(i)
+                SavedServer(o.getString("name"), Endpoint(o.getString("host"), o.getInt("port")))
+            }
+        }.getOrDefault(emptyList())
+        set(value) = store.edit().putString(
+            KEY_SAVED,
+            org.json.JSONArray(value.map {
+                JSONObject().put("name", it.name).put("host", it.endpoint.host).put("port", it.endpoint.port)
+            }).toString(),
+        ).apply()
+
     private companion object {
+        const val KEY_SAVED = "savedServers"
         const val KEY_BACKEND = "backendUrl"
         const val KEY_TOKEN = "token"
         const val KEY_AUTO_UPDATE = "autoUpdate"

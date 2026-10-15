@@ -29,6 +29,28 @@ object Minecraft {
         return Result.NotInstalled
     }
 
+    /** Java Edition on Android runs through community launchers; these are the ones V-Client can hand over to. */
+    val JAVA_LAUNCHERS = listOf("net.kdt.pojavlaunch" to "PojavLauncher", "git.artdeell.mojo" to "MojoLauncher")
+
+    fun isInstalled(context: Context, pkg: String): Boolean = context.packageManager.getLaunchIntentForPackage(pkg) != null
+
+    /** Opens an installed app by package name. Returns false when it isn't installed. */
+    fun launchApp(context: Context, pkg: String): Boolean {
+        val intent = context.packageManager.getLaunchIntentForPackage(pkg) ?: return false
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return true
+    }
+
+    /** Parses "host" or "host:port" (Bedrock default port 19132). Returns null for anything invalid. */
+    fun parseAddress(input: String): Endpoint? {
+        val text = input.trim()
+        if (text.isEmpty() || text.any { it.isWhitespace() || it == '/' }) return null
+        val host = text.substringBeforeLast(':', text)
+        val port = if (text.contains(':')) text.substringAfterLast(':').toIntOrNull() else 19132
+        if (host.isEmpty() || port == null || port !in 1..65535) return null
+        return Endpoint(host, port)
+    }
+
     fun openStorePage(context: Context) {
         val market = Uri.parse("market://details?id=$PACKAGE")
         if (!open(context, market)) open(context, Uri.parse("https://play.google.com/store/apps/details?id=$PACKAGE"))

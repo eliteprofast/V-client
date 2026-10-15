@@ -10,6 +10,7 @@ import com.vclient.android.data.Announcement
 import com.vclient.android.data.ApiClient
 import com.vclient.android.data.NewsPost
 import com.vclient.android.data.Prefs
+import com.vclient.android.data.SavedServer
 import com.vclient.android.data.ServerConfig
 import com.vclient.android.data.ServerStatus
 import com.vclient.android.data.Session
@@ -28,6 +29,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var backendUrl by mutableStateOf(prefs.backendUrl); private set
     var autoUpdate by mutableStateOf(prefs.autoUpdate); private set
     var serverConfig by mutableStateOf(prefs.serverConfig); private set
+
+    var servers by mutableStateOf(prefs.savedServers); private set
 
     var status by mutableStateOf<ServerStatus?>(null); private set
     var statusError by mutableStateOf<String?>(null); private set
@@ -116,6 +119,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun filterNews(category: String?) {
         newsFilter = category
         refreshNews()
+    }
+
+    /** Returns an error message, or null when the server was added. */
+    fun addServer(name: String, address: String): String? {
+        val endpoint = Minecraft.parseAddress(address) ?: return "Enter an address like play.example.com or play.example.com:19132"
+        val label = name.trim().ifEmpty { endpoint.host }.take(40)
+        servers = (servers + SavedServer(label, endpoint)).also { prefs.savedServers = it }
+        return null
+    }
+
+    fun removeServer(server: SavedServer) {
+        servers = (servers - server).also { prefs.savedServers = it }
     }
 
     fun reportJoin() {

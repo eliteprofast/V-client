@@ -145,6 +145,7 @@ publicRoutes.latestDownload = (ctx) => (req, res) => {
   const latest = PLATFORMS.includes(platform) ? latestRelease(ctx.db, platform) : null;
   // Until the first Windows release is published through the admin panel, serve the bundled setup.
   if (!latest && platform === 'windows') return res.redirect(302, '/VSMPClientSetup.exe');
+  if (!latest && platform === 'android') return res.redirect(302, '/V-Client.apk');
   if (!latest) return res.status(404).send('No release has been published for this platform yet.');
   return res.redirect(302, `/downloads/${encodeURIComponent(latest.file_name)}`);
 };

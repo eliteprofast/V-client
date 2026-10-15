@@ -4,6 +4,8 @@ data class Endpoint(val host: String, val port: Int) {
     val address: String get() = "$host:$port"
 }
 
+data class SavedServer(val name: String, val endpoint: Endpoint)
+
 /** VSMP connection details served by the backend, cached so the Play button works offline. */
 data class ServerConfig(
     val name: String = "VSMP",

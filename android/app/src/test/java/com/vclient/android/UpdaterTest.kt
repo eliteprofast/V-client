@@ -1,6 +1,7 @@
 package com.vclient.android
 
 import com.vclient.android.data.ApiClient
+import com.vclient.android.data.Endpoint
 import com.vclient.android.update.Updater
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,5 +27,16 @@ class UpdaterTest {
         assertFalse(ApiClient.isValidUrl("not a url"))
         assertFalse(ApiClient.isValidUrl(""))
         assertEquals("https://x.test", ApiClient.normalize(" https://x.test// "))
+    }
+
+    @Test
+    fun serverAddressesAreParsedStrictly() {
+        assertEquals(Endpoint("play.example.com", 19132), Minecraft.parseAddress(" play.example.com "))
+        assertEquals(Endpoint("1.2.3.4", 25565), Minecraft.parseAddress("1.2.3.4:25565"))
+        assertEquals(null, Minecraft.parseAddress(""))
+        assertEquals(null, Minecraft.parseAddress("host:99999"))
+        assertEquals(null, Minecraft.parseAddress("host:abc"))
+        assertEquals(null, Minecraft.parseAddress("http://host"))
+        assertEquals(null, Minecraft.parseAddress("two words"))
     }
 }

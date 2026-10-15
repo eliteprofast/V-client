@@ -4,13 +4,13 @@ Kotlin + Jetpack Compose (Material 3). Package `com.vclient.android`, minSdk 26 
 
 ## What it does
 
-- **Home:** big **PLAY VSMP** button (opens Minecraft Bedrock and connects to the server), live online state + player count, announcements, Java/Bedrock addresses with copy buttons, Discord and website buttons.
+- **Home:** **Launch Minecraft** (Bedrock), one-tap **PLAY VSMP**, a server list where you can add and join any server, live VSMP status + player count, announcements, address copy buttons, Discord and website buttons. If PojavLauncher or MojoLauncher is installed, a button opens it for Java Edition.
 - **News:** the same feed as the website and the Windows launcher, filterable by Launcher / Server.
 - **Account:** sign in or create the shared V-Client account and link your Minecraft / Ely.by names.
 - **Settings:** backend address, update-check toggle, manual update check, version.
 - **Updates:** checks `GET /api/launcher/update`, downloads the APK from your backend only, verifies size + SHA-256, then opens Android's installer (the first time, Android asks you to allow installs from V-Client).
 
-Minecraft Java Edition cannot run on Android, so **Play** uses the `minecraft://connect` link of Minecraft Bedrock (`com.mojang.minecraftpe`). If Minecraft is not installed the app offers the Play Store page.
+Android can only run Minecraft Bedrock natively, so V-Client opens the Bedrock app and connects with a `minecraft://connect` link. Java Edition on Android needs a community launcher (PojavLauncher / MojoLauncher), which V-Client opens for you if installed; V-Client does not embed a Java runtime itself.
 
 ## Build
 

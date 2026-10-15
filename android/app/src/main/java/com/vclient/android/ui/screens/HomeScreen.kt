@@ -150,7 +150,9 @@ fun HomeScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        // Java players can't run on Android, but can copy the address for their PC.
+        ServersPanel(viewModel) { text, missing -> message = text; notInstalled = missing }
+
+        // Addresses for copying (Java players on a PC, or a friend joining by hand).
         Panel {
             SectionLabel("Server addresses")
             AddressRow("Java", config.java.address) { Minecraft.copy(context, "VSMP Java address", config.java.address) }

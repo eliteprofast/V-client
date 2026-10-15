@@ -4,6 +4,7 @@
 // backend is unreachable (for example the site is opened from static hosting) the page still
 // works and falls back to the bundled Windows setup file.
 const FALLBACK_WINDOWS_URL = "./VSMPClientSetup.exe?v=settings-1";
+const FALLBACK_ANDROID_URL = "./V-Client.apk";
 const DEFAULT_JAVA_ADDRESS = "neuron.zeroxhost.space:19145";
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -73,25 +74,14 @@ api("/launcher/releases").then((releases) => {
   });
   $$("[data-download='android']").forEach((link) => {
     const android = releases.android;
-    if (android) {
-      link.href = "/download/android";
-      const version = $("[data-version]", link);
-      if (version) version.textContent = `v${android.version}`;
-    } else {
-      link.classList.add("is-disabled");
-      link.removeAttribute("href");
-      link.setAttribute("aria-disabled", "true");
-      const label = $("[data-label]", link);
-      if (label) label.textContent = "Android build coming soon";
-    }
+    link.href = android ? "/download/android" : FALLBACK_ANDROID_URL;
+    const version = $("[data-version]", link);
+    if (version && android) version.textContent = `v${android.version}`;
   });
   fillReleaseCards(releases);
 }).catch(() => {
   $$("[data-download='windows']").forEach((link) => { link.href = FALLBACK_WINDOWS_URL; });
-  $$("[data-download='android']").forEach((link) => {
-    link.classList.add("is-disabled");
-    link.removeAttribute("href");
-  });
+  $$("[data-download='android']").forEach((link) => { link.href = FALLBACK_ANDROID_URL; });
 });
 
 function fillReleaseCards(releases) {
@@ -101,7 +91,7 @@ function fillReleaseCards(releases) {
     if (!meta) continue;
     meta.textContent = release
       ? `Version ${release.version} · ${formatBytes(release.size)} · released ${formatDate(release.publishedAt)}`
-      : platform === "windows" ? "Bundled setup (version history appears once a release is published)" : "No build has been published yet";
+      : "Bundled build (version details appear once a release is published)";
     const hash = $(`[data-release-hash='${platform}']`);
     if (hash && release && release.sha256) hash.textContent = `SHA-256 ${release.sha256}`;
     const notes = $(`[data-release-notes='${platform}']`);
