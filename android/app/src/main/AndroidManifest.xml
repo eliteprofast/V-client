@@ -7,8 +7,6 @@
     <!-- Lets the app see whether Minecraft (Bedrock) is installed before trying to open it. -->
     <queries>
         <package android:name="com.mojang.minecraftpe" />
-        <package android:name="net.kdt.pojavlaunch" />
-        <package android:name="git.artdeell.mojo" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="minecraft" />

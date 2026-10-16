@@ -29,11 +29,6 @@ object Minecraft {
         return Result.NotInstalled
     }
 
-    /** Java Edition on Android runs through community launchers; these are the ones V-Client can hand over to. */
-    val JAVA_LAUNCHERS = listOf("net.kdt.pojavlaunch" to "PojavLauncher", "git.artdeell.mojo" to "MojoLauncher")
-
-    fun isInstalled(context: Context, pkg: String): Boolean = context.packageManager.getLaunchIntentForPackage(pkg) != null
-
     /** Opens an installed app by package name. Returns false when it isn't installed. */
     fun launchApp(context: Context, pkg: String): Boolean {
         val intent = context.packageManager.getLaunchIntentForPackage(pkg) ?: return false

@@ -66,30 +66,6 @@ fun ServersPanel(viewModel: MainViewModel, onMessage: (String?, Boolean) -> Unit
 }
 
 @Composable
-internal fun JavaHelpDialog(context: android.content.Context, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Set up Java Edition (cracked)") },
-        text = {
-            Text(
-                "Java Edition runs through a community launcher, which V-Client opens for you:\n\n" +
-                    "1. Install PojavLauncher (or MojoLauncher).\n" +
-                    "2. Add an account: choose a local / offline account and any username.\n" +
-                    "3. Install a version (for example 1.21.11), optionally with Fabric to use mods.\n" +
-                    "4. Press PLAY in V-Client any time to open it.\n\n" +
-                    "Offline accounts work in singleplayer and on servers that allow offline players.",
-            )
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Got it") } },
-        dismissButton = {
-            TextButton(onClick = {
-                Minecraft.openWebLink(context, "https://github.com/PojavLauncherTeam/PojavLauncher")
-            }) { Text("Get PojavLauncher") }
-        },
-    )
-}
-
-@Composable
 private fun ServerRow(name: String, address: String, onRemove: () -> Unit, onJoin: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Column(Modifier.weight(1f)) {

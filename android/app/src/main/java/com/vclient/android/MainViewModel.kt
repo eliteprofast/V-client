@@ -9,7 +9,6 @@ import androidx.lifecycle.viewModelScope
 import com.vclient.android.data.Announcement
 import com.vclient.android.data.ApiClient
 import com.vclient.android.data.NewsPost
-import com.vclient.android.data.PlayMode
 import com.vclient.android.data.Prefs
 import com.vclient.android.data.SavedServer
 import com.vclient.android.data.ServerConfig
@@ -33,8 +32,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var serverConfig by mutableStateOf(prefs.serverConfig); private set
 
     var servers by mutableStateOf(prefs.savedServers); private set
-
-    var playMode by mutableStateOf(prefs.playMode); private set
 
     var status by mutableStateOf<ServerStatus?>(null); private set
     var statusError by mutableStateOf<String?>(null); private set
@@ -126,11 +123,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeServer(server: SavedServer) {
         servers = (servers - server).also { prefs.savedServers = it }
-    }
-
-    fun updatePlayMode(mode: PlayMode) {
-        prefs.playMode = mode
-        playMode = mode
     }
 
     fun reportJoin() {

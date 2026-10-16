@@ -63,12 +63,7 @@ class Prefs(context: Context) {
             }).toString(),
         ).apply()
 
-    var playMode: PlayMode
-        get() = if (store.getString(KEY_MODE, "") == PlayMode.OFFLINE.key) PlayMode.OFFLINE else PlayMode.PREMIUM
-        set(value) = store.edit().putString(KEY_MODE, value.key).apply()
-
     private companion object {
-        const val KEY_MODE = "playMode"
         const val KEY_SAVED = "savedServers"
         const val KEY_BACKEND = "backendUrl"
         const val KEY_TOKEN = "token"
