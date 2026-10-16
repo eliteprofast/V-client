@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.pm.PackageInfo
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.vclient.android.data.PlayMode
 import com.vclient.android.ui.screens.AccountScreen
@@ -98,6 +100,18 @@ class ScreenshotTest {
         show { ServersScreen(vm) }
         compose.waitForIdle()
         save("3-bedrock-server-settings")
+    }
+
+    @Test
+    fun demoWorldInGame() {
+        compose.mainClock.autoAdvance = false
+        show { com.vclient.android.ui.screens.DemoScreen(onExit = {}) }
+        compose.onNodeWithText("V-Client Demo World").assertExists()
+        save("7-demo-welcome")
+        compose.onNodeWithText("Start exploring").performClick()
+        // The renderer works on a background thread, so give real time between simulated frames.
+        repeat(25) { compose.mainClock.advanceTimeBy(50); Thread.sleep(40) }
+        save("8-demo-in-game")
     }
 
     @Test

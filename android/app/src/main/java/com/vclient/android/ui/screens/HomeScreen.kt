@@ -47,7 +47,7 @@ import com.vclient.android.ui.theme.Offline
 import com.vclient.android.ui.theme.Online
 
 @Composable
-fun HomeScreen(viewModel: MainViewModel, onOpenServers: () -> Unit, modifier: Modifier = Modifier) {
+fun HomeScreen(viewModel: MainViewModel, onOpenServers: () -> Unit, modifier: Modifier = Modifier, onPlayDemo: () -> Unit = {}) {
     val context = LocalContext.current
     val preferred = viewModel.playMode
 
@@ -104,6 +104,21 @@ fun HomeScreen(viewModel: MainViewModel, onOpenServers: () -> Unit, modifier: Mo
         } else {
             BedrockCard(viewModel, highlighted = true, onOpenServers = onOpenServers)
             JavaCard(viewModel, highlighted = false)
+        }
+
+        // Free, offline, original sandbox that needs no Minecraft at all.
+        Panel {
+            Text("Demo World", style = MaterialTheme.typography.titleLarge)
+            Text(
+                DEMO_NOTICE,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(onClick = onPlayDemo, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Play Demo World", style = MaterialTheme.typography.titleMedium)
+            }
         }
 
         val config = viewModel.serverConfig

@@ -334,3 +334,7 @@ h1 span, .section-heading h2 span, .download-cta h2 span { color: var(--gold); }
 .shot figcaption { display: flex; flex-direction: column; gap: 3px; padding: 12px 4px 4px; }
 .shot figcaption b { font: 600 14px var(--font-display); }
 .shot figcaption span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+.shot-grid.wide { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); margin-bottom: 20px; }
+.hint-line { margin-top: 14px; color: var(--muted); font-size: 12px; }
+.app-gallery .section-heading p b { color: var(--gold-pale); }

@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.vclient.android.ui.screens.AccountScreen
+import com.vclient.android.ui.screens.DemoScreen
 import com.vclient.android.ui.screens.HomeScreen
 import com.vclient.android.ui.screens.NewsScreen
 import com.vclient.android.ui.screens.ServersScreen
@@ -55,6 +56,11 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 @Composable
 private fun VClientApp(viewModel: MainViewModel) {
     var selected by rememberSaveable { mutableStateOf(Tab.Home) }
+    var demoOpen by rememberSaveable { mutableStateOf(false) }
+    if (demoOpen) {
+        DemoScreen(onExit = { demoOpen = false })
+        return
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
@@ -72,7 +78,7 @@ private fun VClientApp(viewModel: MainViewModel) {
     ) { padding ->
         val content = Modifier.padding(padding)
         when (selected) {
-            Tab.Home -> HomeScreen(viewModel, onOpenServers = { selected = Tab.Servers }, modifier = content)
+            Tab.Home -> HomeScreen(viewModel, onOpenServers = { selected = Tab.Servers }, modifier = content, onPlayDemo = { demoOpen = true })
             Tab.Servers -> ServersScreen(viewModel, content)
             Tab.News -> NewsScreen(viewModel, content)
             Tab.Account -> AccountScreen(viewModel, content)
