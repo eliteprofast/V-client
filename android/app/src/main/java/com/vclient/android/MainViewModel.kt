@@ -12,6 +12,7 @@ import com.vclient.android.data.NewsPost
 import com.vclient.android.data.Prefs
 import com.vclient.android.data.SavedServer
 import com.vclient.android.data.ServerConfig
+import com.vclient.android.data.ServerPing
 import com.vclient.android.data.ServerStatus
 import com.vclient.android.data.Session
 import com.vclient.android.data.UpdateInfo
@@ -89,14 +90,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshStatus() {
         viewModelScope.launch {
             val api = client()
-            if (!api.configured) {
-                statusError = "Set the V-Client backend address in Settings."
-                return@launch
-            }
             statusLoading = true
-            runCatching { api.serverStatus() }
-                .onSuccess { status = it; statusError = null }
-                .onFailure { if (it !is CancellationException) statusError = it.message ?: "Could not reach the backend." }
+            // Prefer the backend (cached for everyone); if it is down, ask the game server directly.
+            val viaBackend = if (api.configured) runCatching { api.serverStatus() } else null
+            val result = viaBackend?.getOrNull()
+                ?: ServerPing.status(serverConfig.java, serverConfig.bedrock)
+            status = result
+            statusError = if (result.anyOnline) null else "VSMP didn't answer. It may be offline, or your connection is blocking it."
             statusLoading = false
         }
     }
