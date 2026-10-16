@@ -325,3 +325,12 @@ h1 span, .section-heading h2 span, .download-cta h2 span { color: var(--gold); }
   .server-strip { grid-template-columns: 1fr; }
   .page-main { padding-block: 40px 64px; }
 }
+
+/* ---- App screenshot gallery ---- */
+.app-gallery { margin-top: 64px; }
+.shot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; align-items: start; }
+.shot { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+.shot img { display: block; width: 100%; height: auto; border-radius: 10px; background: #080b16; }
+.shot figcaption { display: flex; flex-direction: column; gap: 3px; padding: 12px 4px 4px; }
+.shot figcaption b { font: 600 14px var(--font-display); }
+.shot figcaption span { color: var(--muted); font-size: 12px; line-height: 1.5; }
