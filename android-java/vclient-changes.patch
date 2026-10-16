@@ -1,0 +1,136 @@
+﻿diff --git a/app_pojavlauncher/build.gradle b/app_pojavlauncher/build.gradle
+index aafdd1e..e9975f7 100644
+--- a/app_pojavlauncher/build.gradle
++++ b/app_pojavlauncher/build.gradle
+@@ -112,12 +112,14 @@ android {
+     }
+ 
+     defaultConfig {
+-        applicationId "net.kdt.pojavlaunch"
+-        minSdkVersion 21
++        applicationId "com.vclient.javaclient"
++        minSdkVersion 26
+         targetSdkVersion 34
+         versionCode getDateSeconds()
+         versionName getVersionName()
+         multiDexEnabled true //important
++        // V-Client ships arm64 only (nearly all current phones) to keep the APK small enough to host.
++        ndk { abiFilters 'arm64-v8a' }
+         resValue 'string', 'curseforge_api_key', getCFApiKey()
+     }
+ 
+@@ -128,9 +130,9 @@ android {
+             shrinkResources false
+             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+             signingConfig signingConfigs.customDebug
+-            resValue 'string', 'application_package', 'net.kdt.pojavlaunch.debug'
+-            resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder.debug'
+-            resValue 'string', 'shareProviderAuthority', 'net.kdt.pojavlaunch.scoped.controlfolder.debug'
++            resValue 'string', 'application_package', 'com.vclient.javaclient.debug'
++            resValue 'string', 'storageProviderAuthorities', 'com.vclient.javaclient.scoped.gamefolder.debug'
++            resValue 'string', 'shareProviderAuthority', 'com.vclient.javaclient.scoped.controlfolder.debug'
+         }
+         proguard {
+             initWith debug
+@@ -149,8 +151,8 @@ android {
+             // defaultConfig already set
+             // multiDexEnabled = true
+             // debuggable = true
+-            resValue 'string', 'storageProviderAuthorities', 'net.kdt.pojavlaunch.scoped.gamefolder'
+-            resValue 'string', 'application_package', 'net.kdt.pojavlaunch'
++            resValue 'string', 'storageProviderAuthorities', 'com.vclient.javaclient.scoped.gamefolder'
++            resValue 'string', 'application_package', 'com.vclient.javaclient'
+         }
+         gplay {
+             initWith release
+diff --git a/app_pojavlauncher/src/main/AndroidManifest.xml b/app_pojavlauncher/src/main/AndroidManifest.xml
+index ebaf694..51e6d7f 100644
+--- a/app_pojavlauncher/src/main/AndroidManifest.xml
++++ b/app_pojavlauncher/src/main/AndroidManifest.xml
+@@ -29,7 +29,7 @@
+         android:hasFragileUserData="true"
+         android:icon="@mipmap/ic_launcher"
+         android:isGame="true"
+-        android:label="@string/app_name"
++        android:label="V-Client"
+         android:process=":launcher"
+         android:resizeableActivity="true"
+         android:roundIcon="@mipmap/ic_launcher_round"
+@@ -45,7 +45,7 @@
+         <activity
+             android:name=".TestStorageActivity"
+             android:exported="true"
+-            android:label="@string/app_short_name"
++            android:label="V-Client"
+             android:launchMode="singleTop">
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN" />
+@@ -55,7 +55,7 @@
+         </activity>
+         <activity
+             android:name=".LauncherActivity"
+-            android:label="@string/app_short_name"
++            android:label="V-Client"
+             android:windowSoftInputMode="adjustResize"/>
+         <activity
+             android:name=".ImportControlActivity"
+diff --git a/app_pojavlauncher/src/main/res/drawable/ic_vclient_foreground.xml b/app_pojavlauncher/src/main/res/drawable/ic_vclient_foreground.xml
+new file mode 100644
+index 0000000..f9556db
+--- /dev/null
++++ b/app_pojavlauncher/src/main/res/drawable/ic_vclient_foreground.xml
+@@ -0,0 +1,16 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="108dp"
++    android:height="108dp"
++    android:viewportWidth="108"
++    android:viewportHeight="108">
++    <path
++        android:fillColor="#E7BF68"
++        android:pathData="M30,30h48v48h-48z" />
++    <path
++        android:fillColor="#101321"
++        android:pathData="M39,41h9.6l5.4,16 5.4,-16h9.6l-10,27h-10z" />
++    <path
++        android:fillColor="#FFF0BD"
++        android:pathData="M70,26h9v9h-9z" />
++</vector>
+diff --git a/app_pojavlauncher/src/main/res/mipmap-anydpi-v26/ic_launcher.xml b/app_pojavlauncher/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+index 036d09b..1ecc72c 100644
+--- a/app_pojavlauncher/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
++++ b/app_pojavlauncher/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+@@ -1,5 +1,5 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+     <background android:drawable="@color/ic_launcher_background"/>
+-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+-</adaptive-icon>
+\ No newline at end of file
++    <foreground android:drawable="@drawable/ic_vclient_foreground"/>
++</adaptive-icon>
+diff --git a/app_pojavlauncher/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml b/app_pojavlauncher/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+index 036d09b..1ecc72c 100644
+--- a/app_pojavlauncher/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
++++ b/app_pojavlauncher/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+@@ -1,5 +1,5 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+     <background android:drawable="@color/ic_launcher_background"/>
+-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+-</adaptive-icon>
+\ No newline at end of file
++    <foreground android:drawable="@drawable/ic_vclient_foreground"/>
++</adaptive-icon>
+diff --git a/app_pojavlauncher/src/main/res/values/ic_launcher_background.xml b/app_pojavlauncher/src/main/res/values/ic_launcher_background.xml
+index c5d5899..a7e1659 100644
+--- a/app_pojavlauncher/src/main/res/values/ic_launcher_background.xml
++++ b/app_pojavlauncher/src/main/res/values/ic_launcher_background.xml
+@@ -1,4 +1,4 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <color name="ic_launcher_background">#FFFFFF</color>
+-</resources>
+\ No newline at end of file
++    <color name="ic_launcher_background">#080B16</color>
++</resources>
