@@ -149,10 +149,13 @@ class ApiClient(baseUrl: String, private val token: String? = null) {
                 val status = connection.responseCode
                 val stream = if (status >= 400) connection.errorStream else connection.inputStream
                 val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                // A web host that isn't running the V-Client backend answers with an empty or HTML page.
+                val notBackend = "The V-Client server isn't available right now. Try again later, or check the backend address in Settings."
+                if (status < 400 && text.isBlank()) throw IOException(notBackend)
                 val json = try {
                     if (text.isBlank()) JSONObject() else JSONObject(text)
                 } catch (e: org.json.JSONException) {
-                    throw IOException("The backend returned an unexpected response (HTTP $status).", e)
+                    throw IOException(notBackend, e)
                 }
                 if (status >= 400) throw ApiException(json.optString("error").ifBlank { "The backend returned HTTP $status." })
                 json

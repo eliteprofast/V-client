@@ -1,0 +1,35 @@
+# One-click Render setup for the V-Client backend (API + website).
+# Render dashboard -> New -> Blueprint -> pick this repo. Then delete the old static-site service.
+#
+# The free plan has no persistent disk: accounts, news and uploaded installers are wiped whenever the
+# service restarts. For real use, change `plan` to `starter` and uncomment the disk + DATA_DIR below.
+services:
+  - type: web
+    name: vsmp-client-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.13.0
+      - key: TRUST_PROXY
+        value: "1"
+      - key: ADMIN_PASSWORD
+        sync: false   # you are asked for this in the dashboard
+      - key: JAVA_HOST
+        value: neuron.zeroxhost.space
+      - key: JAVA_PORT
+        value: "19145"
+      - key: BEDROCK_PORT
+        value: "19145"
+      - key: DISCORD_URL
+        value: https://discord.gg/UnjU4PPMa
+      # - key: DATA_DIR
+      #   value: /var/data
+    # disk:
+    #   name: vclient-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
