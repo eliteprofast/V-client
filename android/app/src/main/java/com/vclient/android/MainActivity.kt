@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Settings
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.vclient.android.ui.screens.AccountScreen
 import com.vclient.android.ui.screens.HomeScreen
 import com.vclient.android.ui.screens.NewsScreen
+import com.vclient.android.ui.screens.ServersScreen
 import com.vclient.android.ui.screens.SettingsScreen
 import com.vclient.android.ui.theme.VClientTheme
 
@@ -44,6 +46,7 @@ class MainActivity : ComponentActivity() {
 
 private enum class Tab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Filled.Home),
+    Servers("Servers", Icons.Filled.Dns),
     News("News", Icons.Filled.Newspaper),
     Account("Account", Icons.Filled.AccountCircle),
     Settings("Settings", Icons.Filled.Settings),
@@ -69,7 +72,8 @@ private fun VClientApp(viewModel: MainViewModel) {
     ) { padding ->
         val content = Modifier.padding(padding)
         when (selected) {
-            Tab.Home -> HomeScreen(viewModel, content)
+            Tab.Home -> HomeScreen(viewModel, onOpenServers = { selected = Tab.Servers }, modifier = content)
+            Tab.Servers -> ServersScreen(viewModel, content)
             Tab.News -> NewsScreen(viewModel, content)
             Tab.Account -> AccountScreen(viewModel, content)
             Tab.Settings -> SettingsScreen(viewModel, content)

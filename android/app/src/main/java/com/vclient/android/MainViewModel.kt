@@ -8,7 +8,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vclient.android.data.Announcement
 import com.vclient.android.data.ApiClient
+import com.vclient.android.data.Endpoint
+import com.vclient.android.data.JavaVersions
 import com.vclient.android.data.NewsPost
+import com.vclient.android.data.PlayMode
 import com.vclient.android.data.Prefs
 import com.vclient.android.data.SavedServer
 import com.vclient.android.data.ServerConfig
@@ -32,6 +35,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var serverConfig by mutableStateOf(prefs.serverConfig); private set
 
     var servers by mutableStateOf(prefs.savedServers); private set
+
+    var playMode by mutableStateOf(prefs.playMode); private set
+    var javaVersion by mutableStateOf(prefs.javaVersion); private set
+    var javaVersions by mutableStateOf(JavaVersions.FALLBACK); private set
+    var vsmpAddress by mutableStateOf(prefs.vsmpAddress); private set
+
+    /** The VSMP address the one-click button uses: the player's own override, else the server's published one. */
+    val vsmp: Endpoint
+        get() = Minecraft.parseAddress(vsmpAddress) ?: serverConfig.bedrock
 
     var status by mutableStateOf<ServerStatus?>(null); private set
     var statusError by mutableStateOf<String?>(null); private set
@@ -64,6 +76,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (prefs.token.isNotBlank()) loadProfile()
         if (autoUpdate) checkForUpdate(manual = false)
         viewModelScope.launch { client().reportEvent(prefs.installId, "launch") }
+        viewModelScope.launch {
+            javaVersions = JavaVersions.load()
+            if (javaVersion.isBlank()) javaVersion = javaVersions.first()
+        }
+    }
+
+    fun updatePlayMode(mode: PlayMode) {
+        prefs.playMode = mode
+        playMode = mode
+    }
+
+    fun updateJavaVersion(version: String) {
+        prefs.javaVersion = version
+        javaVersion = version
+    }
+
+    /** Returns an error message, or null when saved. An empty value goes back to the server's own address. */
+    fun saveVsmpAddress(value: String): String? {
+        val text = value.trim()
+        if (text.isNotEmpty() && Minecraft.parseAddress(text) == null) {
+            return "Enter an address like play.example.com or play.example.com:19132"
+        }
+        prefs.vsmpAddress = text
+        vsmpAddress = text
+        return null
     }
 
     fun refreshAll() {

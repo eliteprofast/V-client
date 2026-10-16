@@ -63,7 +63,24 @@ class Prefs(context: Context) {
             }).toString(),
         ).apply()
 
+    var playMode: PlayMode
+        get() = if (store.getString(KEY_MODE, "") == PlayMode.JAVA.key) PlayMode.JAVA else PlayMode.BEDROCK
+        set(value) = store.edit().putString(KEY_MODE, value.key).apply()
+
+    /** Java version the player wants to play; they pick it again inside PojavLauncher (it has no launch API). */
+    var javaVersion: String
+        get() = store.getString(KEY_JAVA_VERSION, "").orEmpty()
+        set(value) = store.edit().putString(KEY_JAVA_VERSION, value).apply()
+
+    /** "host:port" typed on the Bedrock settings page; empty means "use the server's own address". */
+    var vsmpAddress: String
+        get() = store.getString(KEY_VSMP_ADDRESS, "").orEmpty()
+        set(value) = store.edit().putString(KEY_VSMP_ADDRESS, value).apply()
+
     private companion object {
+        const val KEY_MODE = "playMode"
+        const val KEY_JAVA_VERSION = "javaVersion"
+        const val KEY_VSMP_ADDRESS = "vsmpAddress"
         const val KEY_SAVED = "savedServers"
         const val KEY_BACKEND = "backendUrl"
         const val KEY_TOKEN = "token"

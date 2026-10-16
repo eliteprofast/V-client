@@ -30,6 +30,17 @@ class UpdaterTest {
     }
 
     @Test
+    fun javaVersionListKeepsOnlyReleases() {
+        val manifest = """{"versions":[
+            {"id":"26.4-snapshot-3","type":"snapshot"},
+            {"id":"1.21.11","type":"release"},
+            {"id":"1.21.11-rc3","type":"snapshot"},
+            {"id":"b1.7.3","type":"old_beta"},
+            {"id":"1.20.1","type":"release"}]}"""
+        assertEquals(listOf("1.21.11", "1.20.1"), com.vclient.android.data.JavaVersions.parseReleases(manifest))
+    }
+
+    @Test
     fun serverAddressesAreParsedStrictly() {
         assertEquals(Endpoint("play.example.com", 19132), Minecraft.parseAddress(" play.example.com "))
         assertEquals(Endpoint("1.2.3.4", 25565), Minecraft.parseAddress("1.2.3.4:25565"))

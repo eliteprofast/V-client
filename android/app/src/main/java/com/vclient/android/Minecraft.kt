@@ -8,9 +8,21 @@ import android.content.Intent
 import android.net.Uri
 import com.vclient.android.data.Endpoint
 
-/** Hands the player over to Minecraft: Bedrock Edition is the only edition that exists on Android. */
+/**
+ * Hands the player over to Minecraft. Bedrock Edition is launched directly; Java Edition can't run inside V-Client,
+ * so it is launched through PojavLauncher, a separate app the player installs.
+ */
 object Minecraft {
     const val PACKAGE = "com.mojang.minecraftpe"
+    const val JAVA_PACKAGE = "net.kdt.pojavlaunch"
+    const val JAVA_LAUNCHER_URL = "https://github.com/PojavLauncherTeam/PojavLauncher/releases"
+
+    /** An installed app's version name, or null when it isn't installed. Needs the package in the manifest queries. */
+    fun installedVersion(context: Context, pkg: String): String? = try {
+        context.packageManager.getPackageInfo(pkg, 0).versionName ?: "installed"
+    } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+        null
+    }
 
     sealed interface Result {
         data object Launched : Result
