@@ -24,8 +24,8 @@ android {
         applicationId = "com.vclient.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.3.1"
+        versionCode = 6
+        versionName = "1.4.0"
 
         val backendUrl = (project.findProperty("vclient.backendUrl") as String?) ?: "http://10.0.2.2:8080"
         buildConfigField("String", "DEFAULT_BACKEND_URL", "\"$backendUrl\"")

@@ -18,9 +18,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,39 +51,71 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import com.vclient.android.demo.Block
 import com.vclient.android.demo.DemoGame
-import com.vclient.android.demo.Textures
+import com.vclient.android.demo.Inventory
+import com.vclient.android.demo.ItemStack
+import com.vclient.android.demo.Recipes
+import com.vclient.android.demo.Village
 import com.vclient.android.demo.VoxelRenderer
 import com.vclient.android.ui.theme.Gold
 import com.vclient.android.ui.theme.Midnight
+import com.vclient.android.ui.theme.Offline
+import com.vclient.android.ui.theme.Online
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.floor
+import kotlin.math.hypot
 
 const val DEMO_NOTICE = "This is a V-Client Demo World. Install Minecraft separately for the full game experience."
 
 /**
- * The offline Demo World: an original voxel sandbox with no Minecraft content. Left thumb walks, the right side
- * looks around, and the buttons jump, break and place blocks. The world is saved on the device automatically.
+ * The offline Demo World: an original voxel sandbox with no Minecraft content. A 512 x 512 block island with two
+ * biomes and a village. Nothing is handed out: break blocks, collect materials, open the Bag and craft tools.
+ * The world is saved on the device automatically.
  */
 @Composable
 fun DemoScreen(onExit: () -> Unit) {
     val context = LocalContext.current
     val file = remember { File(context.filesDir, "demo_world.vcw") }
-    val game = remember { DemoGame.loadOrCreate(file) }
-    val renderer = remember { VoxelRenderer(game.world) }
+    var game by remember { mutableStateOf<DemoGame?>(null) }
+    // Building 32 x 32 chunks (or rebuilding a saved world) takes a moment, so it runs off the main thread.
+    LaunchedEffect(Unit) { game = withContext(Dispatchers.Default) { DemoGame.loadOrCreate(file) } }
+
+    val ready = game
+    if (ready == null) {
+        BackHandler { onExit() }
+        Box(Modifier.fillMaxSize().background(Midnight), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                CircularProgressIndicator(color = Gold)
+                Text("Generating your world…", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("32 × 32 chunks · Oak Forest, Cherry Blossom and a village", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+            }
+        }
+    } else {
+        DemoWorldContent(ready, file, onExit)
+    }
+}
+
+@Composable
+private fun DemoWorldContent(game: DemoGame, file: File, onExit: () -> Unit) {
+    val renderer = remember(game) { VoxelRenderer(game.world) }
     var showWelcome by rememberSaveable { mutableStateOf(true) }
-    val welcomeOpen by rememberUpdatedState(showWelcome)
+    var bagOpen by rememberSaveable { mutableStateOf(false) }
+    val paused by rememberUpdatedState(showWelcome || bagOpen)
     var frameId by remember { mutableIntStateOf(0) }
+    var uiRev by remember { mutableIntStateOf(0) }
     var fps by remember { mutableIntStateOf(0) }
     var slot by remember { mutableIntStateOf(game.selectedSlot) }
+    var info by remember { mutableStateOf("") }
+    var hint by remember { mutableStateOf<String?>(null) }
     var image by remember { mutableStateOf<ImageBitmap?>(null) }
 
     fun leave() {
@@ -87,7 +123,7 @@ fun DemoScreen(onExit: () -> Unit) {
         game.save(file, force = true)
         onExit()
     }
-    BackHandler { leave() }
+    BackHandler { if (bagOpen) bagOpen = false else leave() }
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { game.save(file) }
     DisposableEffect(Unit) { onDispose { game.save(file) } }
 
@@ -105,27 +141,34 @@ fun DemoScreen(onExit: () -> Unit) {
                 var last = withFrameNanos { it }
                 var frames = 0
                 var clock = 0.0
+                var infoClock = 1.0
                 var sinceSave = 0.0
+                var seenRevision = game.revision
                 while (isActive) {
                     val now = withFrameNanos { it }
                     val dt = ((now - last) / 1_000_000_000.0).coerceAtMost(0.05)
                     last = now
-                    if (!welcomeOpen) game.tick(dt)
+                    if (!paused) game.tick(dt)
                     withContext(Dispatchers.Default) {
                         renderer.selected = game.target
+                        renderer.breakProgress = game.breakProgress
                         renderer.render(pixels, renderWidth, renderHeight, game.camera())
                     }
                     bitmap.setPixels(pixels, 0, renderWidth, 0, 0, renderWidth, renderHeight)
                     frameId++
                     frames++
                     clock += dt
+                    infoClock += dt
                     sinceSave += dt
+                    if (game.revision != seenRevision) { seenRevision = game.revision; uiRev++ }
+                    if (game.hint != hint) hint = game.hint
                     if (clock >= 1.0) { fps = frames; frames = 0; clock = 0.0 }
+                    if (infoClock >= 0.25) { infoClock = 0.0; info = locationText(game) }
                     if (sinceSave >= 20.0) { game.save(file); sinceSave = 0.0 }
                 }
             }
 
-            // The scene, scaled with hard edges so the blocks stay crisp.
+            // The scene, scaled with hard edges so the blocks stay crisp, plus the crosshair and dig progress.
             Canvas(Modifier.fillMaxSize()) {
                 val current = frameId
                 image?.let { drawImage(it, dstSize = IntSize(size.width.toInt(), size.height.toInt()), filterQuality = FilterQuality.None) }
@@ -134,6 +177,13 @@ fun DemoScreen(onExit: () -> Unit) {
                 val arm = 9.dp.toPx()
                 drawLine(Color.White.copy(alpha = 0.85f), Offset(c.x - arm, c.y), Offset(c.x + arm, c.y), strokeWidth = 2.dp.toPx())
                 drawLine(Color.White.copy(alpha = 0.85f), Offset(c.x, c.y - arm), Offset(c.x, c.y + arm), strokeWidth = 2.dp.toPx())
+                val progress = game.breakProgress
+                if (progress > 0.0) {
+                    val barWidth = 70.dp.toPx()
+                    val top = c.y + 26.dp.toPx()
+                    drawRect(Color.Black.copy(alpha = 0.5f), Offset(c.x - barWidth / 2, top), androidx.compose.ui.geometry.Size(barWidth, 6.dp.toPx()))
+                    drawRect(Gold, Offset(c.x - barWidth / 2, top), androidx.compose.ui.geometry.Size((barWidth * progress).toFloat(), 6.dp.toPx()))
+                }
             }
 
             // Look around: drag anywhere on the right side.
@@ -183,54 +233,173 @@ fun DemoScreen(onExit: () -> Unit) {
             HoldButton("Break", 60, Modifier.align(Alignment.BottomEnd).padding(end = 112.dp, bottom = 64.dp)) { game.breakHeld = it }
             HoldButton("Place", 60, Modifier.align(Alignment.BottomEnd).padding(end = 112.dp, bottom = 136.dp)) { game.placeHeld = it }
 
-            // Hotbar.
+            // Hotbar: the first nine backpack slots. It starts empty; everything is gathered or crafted.
+            val rev = uiRev
             Row(
-                Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                Block.HOTBAR.forEachIndexed { index, block ->
-                    Box(
-                        Modifier.size(34.dp).clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF000000.toInt() or Textures.swatch(block)))
-                            .border(if (index == slot) 3.dp else 1.dp, if (index == slot) Gold else Color.White.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                            .clickable { game.selectedSlot = index; slot = index },
+                for (index in 0 until Inventory.HOTBAR) {
+                    ItemIcon(
+                        game.inventory.slots[index], size = 34.dp, selected = index == slot,
+                        modifier = Modifier.clickable { game.selectedSlot = index; slot = index; uiRev++ },
                     )
                 }
             }
+            val heldLabel = remember(slot, rev) { game.inventory.slots[slot]?.item?.label ?: "Empty hand" }
 
-            // Top bar: exit, the notice, and frame rate.
+            // Top bar: exit, bag, where you are, and what you hold.
             Column(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { leave() }) { Text("Exit", color = Color.White, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = { game.breakHeld = false; game.placeHeld = false; bagOpen = true }) {
+                        Text("Bag & Crafting", color = Gold, fontWeight = FontWeight.Bold)
+                    }
                     Text(
-                        "${game.selectedBlock.label} · $fps fps",
+                        "$heldLabel · $fps fps",
                         color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, modifier = Modifier.weight(1f).padding(start = 8.dp),
                     )
                 }
+                Text(info, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
                 Text(
                     DEMO_NOTICE,
                     color = Color.White, fontSize = 11.sp, lineHeight = 14.sp,
                     modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Midnight.copy(alpha = 0.72f)).padding(horizontal = 10.dp, vertical = 6.dp),
                 )
             }
+
+            hint?.let {
+                Text(
+                    it, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                    modifier = Modifier.align(Alignment.Center).padding(top = 120.dp)
+                        .clip(RoundedCornerShape(10.dp)).background(Midnight.copy(alpha = 0.8f)).padding(horizontal = 14.dp, vertical = 8.dp),
+                )
+            }
         }
+
+        if (bagOpen) BagPanel(game, uiRev, onClose = { bagOpen = false }, onChanged = { uiRev++ })
 
         if (showWelcome) {
             AlertDialog(
                 onDismissRequest = {},
                 title = { Text("V-Client Demo World") },
                 text = {
-                    Text(
-                        "$DEMO_NOTICE\n\n" +
-                            "Drag with your left thumb to walk and with your right thumb to look around. " +
-                            "Use Jump, Break and Place, and pick a block on the bar at the bottom. " +
-                            "Your world is saved on this phone and works without internet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        Text(
+                            "$DEMO_NOTICE\n\n" +
+                                "A 512 × 512 island with an Oak Forest, a Cherry Blossom grove and a village. " +
+                                "You start with nothing: hold Break on a tree to collect logs, open Bag & Crafting to make planks, sticks, " +
+                                "a Crafting Table and tools, then dig for stone, coal, iron and gold.\n\n" +
+                                "Drag with your left thumb to walk and your right thumb to look. " +
+                                "Your world is saved on this phone and works without internet.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 },
                 confirmButton = { TextButton(onClick = { showWelcome = false }) { Text("Start exploring") } },
                 dismissButton = { TextButton(onClick = { leave() }) { Text("Back") } },
             )
+        }
+    }
+}
+
+private fun locationText(game: DemoGame): String {
+    val p = game.player
+    val x = floor(p.x).toInt()
+    val z = floor(p.z).toInt()
+    val where = when {
+        p.inWater -> "Water"
+        game.world.villageCenter?.let { hypot((x - it.first).toDouble(), (z - it.third).toDouble()) <= Village.RADIUS } == true -> "Village"
+        else -> game.world.biomeAt(x, z).label
+    }
+    return "$where  ·  X $x  Y ${floor(p.y).toInt()}  Z $z"
+}
+
+/** A backpack slot: a colour tile for the item, a letter for tools and materials, and a count. */
+@Composable
+fun ItemIcon(stack: ItemStack?, size: Dp = 34.dp, selected: Boolean = false, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(6.dp)
+    Box(
+        modifier.size(size).clip(shape).background(Midnight.copy(alpha = 0.6f))
+            .border(if (selected) 3.dp else 1.dp, if (selected) Gold else Color.White.copy(alpha = 0.35f), shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (stack != null) {
+            Box(
+                Modifier.size(size * 0.66f).clip(RoundedCornerShape(4.dp)).background(Color(0xFF000000.toInt() or stack.item.swatch)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (stack.item.tag.isNotEmpty()) Text(stack.item.tag, color = Color(0xFF101321), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+            if (stack.count > 1) {
+                Text(
+                    "${stack.count}", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp),
+                )
+            }
+        }
+    }
+}
+
+/** The Bag: your 27 slots (tap two to swap) and every recipe, with a Craft button when you have what it needs. */
+@Composable
+private fun BagPanel(game: DemoGame, rev: Int, onClose: () -> Unit, onChanged: () -> Unit) {
+    var pending by remember { mutableStateOf<Int?>(null) }
+    val nearTable = remember(rev) { game.nearTable() }
+    val recipes = remember(rev, nearTable) {
+        Recipes.all.sortedBy { if (it.blocker(game.inventory, nearTable) == null) 0 else 1 }
+    }
+    Box(Modifier.fillMaxSize().background(Midnight).pointerInput(Unit) { detectTapGestures { } }) {
+        Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Bag & Crafting", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.weight(1f))
+                Button(onClick = onClose) { Text("Close") }
+            }
+            Text(
+                if (nearTable) "Crafting Table nearby: all recipes available" else "No Crafting Table nearby: only basic recipes. Craft one, place it, and stand next to it.",
+                color = if (nearTable) Online else Color.White.copy(alpha = 0.7f), fontSize = 12.sp,
+            )
+            Text("Backpack (top row is your hotbar). Tap two slots to swap them.", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+            for (row in 0 until 3) {
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    for (col in 0 until 9) {
+                        val index = row * 9 + col
+                        ItemIcon(
+                            game.inventory.slots[index], size = 36.dp, selected = pending == index,
+                            modifier = Modifier.clickable {
+                                val from = pending
+                                when {
+                                    from == null -> if (game.inventory.slots[index] != null) pending = index
+                                    from == index -> pending = null
+                                    else -> { game.swapSlots(from, index); pending = null; onChanged() }
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+            Text("Recipes", color = Gold, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (recipe in recipes) {
+                    val blocker = recipe.blocker(game.inventory, nearTable)
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.06f)).padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        ItemIcon(ItemStack(recipe.result, recipe.count), size = 40.dp)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (recipe.count > 1) "${recipe.result.label} ×${recipe.count}" else recipe.result.label,
+                                color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                            )
+                            Text(recipe.ingredientText + if (recipe.needsTable) "  (Crafting Table)" else "", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                            Text(blocker ?: "Ready to craft", color = if (blocker == null) Online else Offline, fontSize = 11.sp)
+                        }
+                        Button(onClick = { if (game.craft(recipe)) onChanged() }, enabled = blocker == null) { Text("Craft") }
+                    }
+                }
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.pm.PackageInfo
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -106,12 +107,21 @@ class ScreenshotTest {
     fun demoWorldInGame() {
         compose.mainClock.autoAdvance = false
         show { com.vclient.android.ui.screens.DemoScreen(onExit = {}) }
-        compose.onNodeWithText("V-Client Demo World").assertExists()
+        // Generating the island happens in the background.
+        repeat(1_200) {
+            if (compose.onAllNodesWithText("Start exploring").fetchSemanticsNodes().isNotEmpty()) return@repeat
+            compose.mainClock.advanceTimeBy(50)
+            Thread.sleep(50)
+        }
+        assertTrue("the Demo World finished generating", compose.onAllNodesWithText("Start exploring").fetchSemanticsNodes().isNotEmpty())
         save("7-demo-welcome")
         compose.onNodeWithText("Start exploring").performClick()
         // The renderer works on a background thread, so give real time between simulated frames.
         repeat(25) { compose.mainClock.advanceTimeBy(50); Thread.sleep(40) }
         save("8-demo-in-game")
+        compose.onNodeWithText("Bag & Crafting").performClick()
+        repeat(6) { compose.mainClock.advanceTimeBy(50); Thread.sleep(30) }
+        save("9-demo-bag-crafting")
     }
 
     @Test

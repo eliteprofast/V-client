@@ -18,6 +18,9 @@ class VoxelRenderer(private val world: DemoWorld) {
     /** The block the player is aiming at; its edges are outlined. */
     var selected: BlockHit? = null
 
+    /** 0..1 digging progress of the aimed block; cracks darken its faces as it grows. */
+    var breakProgress: Double = 0.0
+
     fun render(out: IntArray, w: Int, h: Int, cam: Camera) {
         val cy = cos(cam.yaw)
         val sy = sin(cam.yaw)
@@ -103,12 +106,20 @@ class VoxelRenderer(private val world: DemoWorld) {
                 1 -> { u = frac(px); v = frac(pz); face = if (stepY < 0) Textures.TOP else Textures.BOTTOM; shade = if (stepY < 0) 1.0 else 0.52 }
                 else -> { u = frac(px); v = 1 - frac(py); face = Textures.SIDE; shade = 0.68 }
             }
-            var color = Textures.texel(block, face, (u * 8).toInt().coerceIn(0, 7), (v * 8).toInt().coerceIn(0, 7))
+            val tx = (u * 8).toInt().coerceIn(0, 7)
+            val ty = (v * 8).toInt().coerceIn(0, 7)
+            var color = Textures.texel(block, face, tx, ty)
             color = scale(color, shade)
 
             val sel = selected
-            if (sel != null && sel.x == x && sel.y == y && sel.z == z && (u < 0.06 || u > 0.94 || v < 0.06 || v > 0.94)) {
-                color = mix(color, 0xffffff, 0.55)
+            if (sel != null && sel.x == x && sel.y == y && sel.z == z) {
+                if (u < 0.06 || u > 0.94 || v < 0.06 || v > 0.94) {
+                    color = mix(color, 0xffffff, 0.55)
+                } else if (breakProgress > 0.0) {
+                    // Cracks: more and more texels darken as digging progresses.
+                    val crack = ((tx * 73856093) xor (ty * 19349663) xor (face * 83492791)) and 0xff
+                    if (crack < breakProgress * 200) color = scale(color, 0.45)
+                }
             }
             if (waterEnter >= 0) color = mix(color, WATER_COLOR, minOf(0.88, 0.40 + 0.09 * (t - waterEnter)))
             return mix(color, skyColor(dx, dy, dz), fogAmount(t))
