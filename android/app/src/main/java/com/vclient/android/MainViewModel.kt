@@ -37,7 +37,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var servers by mutableStateOf(prefs.savedServers); private set
 
     var playMode by mutableStateOf(prefs.playMode); private set
-    var javaVersion by mutableStateOf(prefs.javaVersion); private set
+    var javaVersion by mutableStateOf(prefs.javaVersion.ifBlank { JavaVersions.FALLBACK.first() }); private set
     var javaVersions by mutableStateOf(JavaVersions.FALLBACK); private set
     var vsmpAddress by mutableStateOf(prefs.vsmpAddress); private set
 
@@ -78,7 +78,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { client().reportEvent(prefs.installId, "launch") }
         viewModelScope.launch {
             javaVersions = JavaVersions.load()
-            if (javaVersion.isBlank()) javaVersion = javaVersions.first()
+            // Follow Mojang's newest release until the player picks one themselves.
+            if (prefs.javaVersion.isBlank()) javaVersion = javaVersions.first()
         }
     }
 

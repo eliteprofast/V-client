@@ -24,8 +24,8 @@ android {
         applicationId = "com.vclient.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         val backendUrl = (project.findProperty("vclient.backendUrl") as String?) ?: "http://10.0.2.2:8080"
         buildConfigField("String", "DEFAULT_BACKEND_URL", "\"$backendUrl\"")
@@ -68,6 +68,9 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
@@ -89,4 +92,9 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    // Robolectric runs the real Compose screens on the JVM, so UI behaviour is tested without an emulator.
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.test:core:1.6.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
