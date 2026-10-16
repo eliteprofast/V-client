@@ -12,7 +12,8 @@ First build. It compiles and the APK is signed and well-formed, but it has **not
 
 [vclient-changes.patch](vclient-changes.patch) is the complete diff against upstream commit `b12ad04` (the last upstream commit). In short:
 
-- App name, app ID (`com.vclient.javaclient`) and icon replaced with V-Client's; minimum Android raised to 8.0.
+- App name, app ID (`com.vclient.javaclient`), version, icon, main logo image (`ic_pojav_full`, replaced by a V-Client PNG; binary, not in the patch) and color palette replaced with V-Client's; English UI texts reworded; minimum Android raised to 8.0. Other-language translations still use the upstream name.
+- The About/credits screens still credit PojavLauncher, as the license requires.
 - Native build limited to `arm64-v8a`, and the non-arm64 Java runtime archives removed, to keep the APK under 100 MB.
 
 Everything else is unmodified upstream code, still under its original license and authorship notices.
