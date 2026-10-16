@@ -28,7 +28,7 @@ import java.io.FileOutputStream
 /** Renders the real screens to PNG files (build/screenshots) so they can be looked at without a phone. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [34], qualifiers = "w411dp-h1100dp-xhdpi")
+@Config(sdk = [34], qualifiers = "w411dp-h1500dp-xhdpi")
 class ScreenshotTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
@@ -45,7 +45,7 @@ class ScreenshotTest {
     private fun save(name: String) {
         val file = File("build/screenshots/$name.png").also { it.parentFile.mkdirs() }
         val width = 822
-        val height = 2200
+        val height = 3000
         val view = compose.activity.window.decorView
         view.measure(
             android.view.View.MeasureSpec.makeMeasureSpec(width, android.view.View.MeasureSpec.EXACTLY),

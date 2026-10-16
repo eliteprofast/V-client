@@ -14,6 +14,9 @@ import com.vclient.android.data.Endpoint
  */
 object Minecraft {
     const val PACKAGE = "com.mojang.minecraftpe"
+    /** Mojang's official free Minecraft Trial app on Google Play. */
+    const val TRIAL_PACKAGE = "com.mojang.minecrafttrialpe"
+    const val TRIAL_INFO_URL = "https://www.minecraft.net/en-us/free-trial"
     const val JAVA_PACKAGE = "net.kdt.pojavlaunch"
     const val JAVA_LAUNCHER_URL = "https://github.com/PojavLauncherTeam/PojavLauncher/releases"
 
@@ -58,9 +61,9 @@ object Minecraft {
         return Endpoint(host, port)
     }
 
-    fun openStorePage(context: Context) {
-        val market = Uri.parse("market://details?id=$PACKAGE")
-        if (!open(context, market)) open(context, Uri.parse("https://play.google.com/store/apps/details?id=$PACKAGE"))
+    fun openStorePage(context: Context, pkg: String = PACKAGE) {
+        val market = Uri.parse("market://details?id=$pkg")
+        if (!open(context, market)) open(context, Uri.parse("https://play.google.com/store/apps/details?id=$pkg"))
     }
 
     fun copy(context: Context, label: String, text: String) {

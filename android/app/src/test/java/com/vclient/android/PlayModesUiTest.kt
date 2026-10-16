@@ -68,6 +68,28 @@ class PlayModesUiTest {
         compose.onNodeWithText("Play Bedrock Edition").assertIsNotEnabled()
         compose.onNodeWithText("Get PojavLauncher").assertExists()
         compose.onNodeWithText("Get Minecraft").assertExists()
+        // Mojang's official free trial is offered too, with its install link.
+        compose.onNodeWithText("Minecraft Trial (free)").assertExists()
+        compose.onNodeWithText("Free trial not installed").assertExists()
+        compose.onNodeWithText("Get the free Minecraft Trial").assertExists()
+    }
+
+    @Test
+    fun installedTrialIsDetectedAndOffered() {
+        install(Minecraft.TRIAL_PACKAGE, "1.21.0.3")
+        show(MainViewModel(app))
+        compose.onNodeWithText("Detected · version 1.21.0.3").assertExists()
+        compose.onNodeWithText("Play Minecraft Trial").assertExists()
+        compose.onNodeWithText("Get the free Minecraft Trial").assertDoesNotExist()
+    }
+
+    @Test
+    fun getTrialOpensTheOfficialStoreListing() {
+        show(MainViewModel(app))
+        compose.onNodeWithText("Get the free Minecraft Trial").performScrollTo().performClick()
+        val started = shadowOf(app).nextStartedActivity
+        assertNotNull("tapping Get must open the store", started)
+        assertEquals("market://details?id=com.mojang.minecrafttrialpe", started.data.toString())
     }
 
     @Test

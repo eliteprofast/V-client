@@ -106,6 +106,8 @@ fun HomeScreen(viewModel: MainViewModel, onOpenServers: () -> Unit, modifier: Mo
             JavaCard(viewModel, highlighted = false)
         }
 
+        TrialCard()
+
         // Free, offline, original sandbox that needs no Minecraft at all.
         Panel {
             Text("Demo World", style = MaterialTheme.typography.titleLarge)
@@ -210,6 +212,40 @@ private fun JavaCard(viewModel: MainViewModel, highlighted: Boolean) {
                 Text("Get PojavLauncher")
             }
         }
+    }
+}
+
+/** Mojang's official free trial of real Minecraft: detected, launched, or installed from Google Play. */
+@Composable
+private fun TrialCard() {
+    val context = LocalContext.current
+    val installed = Minecraft.installedVersion(context, Minecraft.TRIAL_PACKAGE)
+    Panel {
+        EditionHeader("Minecraft Trial (free)", installed, "Free trial not installed")
+        Text(
+            "The official free trial of real Minecraft from Mojang. It's limited (about 100 minutes of Survival play), " +
+                "it can't join online servers, and trial worlds don't carry over to the full game. Limits are set by Mojang and may change.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (installed != null) {
+            OutlinedButton(
+                onClick = { Minecraft.launchApp(context, Minecraft.TRIAL_PACKAGE) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Play Minecraft Trial", style = MaterialTheme.typography.titleMedium)
+            }
+        } else {
+            OutlinedButton(
+                onClick = { Minecraft.openStorePage(context, Minecraft.TRIAL_PACKAGE) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = MaterialTheme.shapes.medium,
+            ) { Text("Get the free Minecraft Trial", style = MaterialTheme.typography.titleMedium) }
+        }
+        TextButton(onClick = { Minecraft.openWebLink(context, Minecraft.TRIAL_INFO_URL) }) { Text("About the trial (minecraft.net)") }
     }
 }
 
