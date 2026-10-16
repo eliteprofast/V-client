@@ -3,7 +3,6 @@ package com.vclient.android.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -12,7 +11,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,7 +29,7 @@ import com.vclient.android.data.Endpoint
 import com.vclient.android.ui.Panel
 import com.vclient.android.ui.SectionLabel
 
-/** Launch Minecraft itself, and join VSMP or any server the player added. */
+/** Servers the player saved; tapping Join opens Minecraft (Bedrock) already connected. */
 @Composable
 fun ServersPanel(viewModel: MainViewModel, onMessage: (String?, Boolean) -> Unit) {
     val context = LocalContext.current
@@ -45,43 +43,17 @@ fun ServersPanel(viewModel: MainViewModel, onMessage: (String?, Boolean) -> Unit
         }
     }
 
-    var showJavaHelp by remember { mutableStateOf(false) }
-    Panel {
-        SectionLabel("Minecraft")
-        Text(
-            "Real: Bedrock Edition from the Play Store, signed in with your Microsoft account.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Button(
-            onClick = {
-                if (Minecraft.launchApp(context, Minecraft.PACKAGE)) onMessage(null, false)
-                else onMessage("Minecraft isn't installed on this phone.", true)
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Launch Minecraft (Bedrock)") }
-
-        val javaLauncher = Minecraft.JAVA_LAUNCHERS.firstOrNull { Minecraft.isInstalled(context, it.first) }
-        Text(
-            "Offline: Java Edition through PojavLauncher or MojoLauncher, which support offline (local) accounts and Fabric mods.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        OutlinedButton(
-            onClick = { if (javaLauncher != null) Minecraft.launchApp(context, javaLauncher.first) else showJavaHelp = true },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (javaLauncher != null) "Open ${javaLauncher.second} (Java Edition)" else "Set up Java Edition (offline)") }
-        if (javaLauncher != null) TextButton(onClick = { showJavaHelp = true }) { Text("How to set it up") }
-    }
-    if (showJavaHelp) JavaHelpDialog(context) { showJavaHelp = false }
-
     Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { SectionLabel("Join a server") }
             IconButton(onClick = { adding = true }) { Icon(Icons.Filled.Add, contentDescription = "Add server") }
         }
-        ServerRow(viewModel.serverConfig.name, viewModel.serverConfig.bedrock.address, onRemove = null) {
-            join(viewModel.serverConfig.name, viewModel.serverConfig.bedrock)
+        if (viewModel.servers.isEmpty()) {
+            Text(
+                "Add any server address and tap Join to open Minecraft already connected to it.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         viewModel.servers.forEach { server ->
             ServerRow(server.name, server.endpoint.address, onRemove = { viewModel.removeServer(server) }) {
@@ -94,18 +66,18 @@ fun ServersPanel(viewModel: MainViewModel, onMessage: (String?, Boolean) -> Unit
 }
 
 @Composable
-private fun JavaHelpDialog(context: android.content.Context, onDismiss: () -> Unit) {
+internal fun JavaHelpDialog(context: android.content.Context, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Java Edition on Android") },
+        title = { Text("Set up Java Edition (cracked)") },
         text = {
             Text(
-                "Java Edition can't run inside V-Client, so it runs through a community launcher:\n\n" +
+                "Java Edition runs through a community launcher, which V-Client opens for you:\n\n" +
                     "1. Install PojavLauncher (or MojoLauncher).\n" +
-                    "2. Add an account: a Microsoft account for the real game, or a local account for offline play.\n" +
+                    "2. Add an account: choose a local / offline account and any username.\n" +
                     "3. Install a version (for example 1.21.11), optionally with Fabric to use mods.\n" +
-                    "4. Press play. Next time V-Client opens it for you from this screen.\n\n" +
-                    "Offline accounts only work on offline-mode servers and singleplayer.",
+                    "4. Press PLAY in V-Client any time to open it.\n\n" +
+                    "Offline accounts work in singleplayer and on servers that allow offline players.",
             )
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Got it") } },
@@ -118,16 +90,14 @@ private fun JavaHelpDialog(context: android.content.Context, onDismiss: () -> Un
 }
 
 @Composable
-private fun ServerRow(name: String, address: String, onRemove: (() -> Unit)?, onJoin: () -> Unit) {
+private fun ServerRow(name: String, address: String, onRemove: () -> Unit, onJoin: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Column(Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.titleMedium)
             Text(address, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Button(onClick = onJoin) { Text("Join") }
-        if (onRemove != null) {
-            IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, contentDescription = "Remove $name") }
-        }
+        IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, contentDescription = "Remove $name") }
     }
 }
 

@@ -13,6 +13,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import com.vclient.android.data.PlayMode
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,8 +42,45 @@ fun AccountScreen(viewModel: MainViewModel, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text("Account", style = MaterialTheme.typography.headlineMedium)
+        PlayModePanel(viewModel)
         val session = viewModel.session
         if (session == null) SignedOut(viewModel) else SignedIn(viewModel, session.username, session.minecraftName, session.elybyName)
+    }
+}
+
+/** Premium owners use the real Bedrock app; everyone else can play Java Edition with an offline account. */
+@Composable
+private fun PlayModePanel(viewModel: MainViewModel) {
+    Panel {
+        SectionLabel("Minecraft account type")
+        Text(
+            "Choose what the PLAY button opens. You can change this any time.",
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ModeOption(
+            selected = viewModel.playMode == PlayMode.PREMIUM,
+            title = "I have Minecraft (Premium)",
+            detail = "PLAY opens Minecraft Bedrock from the Play Store, signed in with your Microsoft account.",
+        ) { viewModel.updatePlayMode(PlayMode.PREMIUM) }
+        ModeOption(
+            selected = viewModel.playMode == PlayMode.OFFLINE,
+            title = "I don't have Minecraft (Cracked)",
+            detail = "PLAY opens Java Edition in PojavLauncher or MojoLauncher, where you play with an offline username.",
+        ) { viewModel.updatePlayMode(PlayMode.OFFLINE) }
+    }
+}
+
+@Composable
+private fun ModeOption(selected: Boolean, title: String, detail: String, onSelect: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onSelect).padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Column(Modifier.padding(start = 10.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

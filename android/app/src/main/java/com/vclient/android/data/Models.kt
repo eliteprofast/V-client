@@ -4,6 +4,9 @@ data class Endpoint(val host: String, val port: Int) {
     val address: String get() = "$host:$port"
 }
 
+/** Which Minecraft the PLAY button opens: the purchased Bedrock app, or Java Edition with offline accounts. */
+enum class PlayMode(val key: String) { PREMIUM("premium"), OFFLINE("offline") }
+
 data class SavedServer(val name: String, val endpoint: Endpoint)
 
 /** VSMP connection details served by the backend, cached so the Play button works offline. */

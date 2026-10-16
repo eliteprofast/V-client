@@ -40,11 +40,6 @@ class MainActivity : ComponentActivity() {
             VClientTheme { VClientApp(viewModel) }
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        viewModel.refreshStatus()
-    }
 }
 
 private enum class Tab(val label: String, val icon: ImageVector) {
