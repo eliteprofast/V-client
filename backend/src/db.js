@@ -65,6 +65,33 @@ function openDatabase(dataDir) {
     );
     CREATE INDEX IF NOT EXISTS events_time ON events (created_at);
     CREATE INDEX IF NOT EXISTS events_install ON events (install_id);
+    CREATE TABLE IF NOT EXISTS cosmetics (
+      id TEXT PRIMARY KEY,
+      version INTEGER NOT NULL DEFAULT 1,
+      category TEXT NOT NULL CHECK (category IN ('cape','wings','hat','emote','animated','trail')),
+      tier TEXT NOT NULL DEFAULT 'free' CHECK (tier IN ('free','premium','event')),
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      sort INTEGER NOT NULL DEFAULT 1000,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      starts_at INTEGER,
+      ends_at INTEGER,
+      definition TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS cosmetic_assets (
+      file_name TEXT PRIMARY KEY,
+      sha256 TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS cosmetic_grants (
+      player_uuid TEXT NOT NULL,
+      cosmetic_id TEXT NOT NULL REFERENCES cosmetics(id) ON DELETE CASCADE,
+      granted_at INTEGER NOT NULL,
+      PRIMARY KEY (player_uuid, cosmetic_id)
+    );
   `);
   return db;
 }

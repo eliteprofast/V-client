@@ -45,10 +45,23 @@ final class MinecraftLauncher {
             "[A-Za-z0-9](?:[A-Za-z0-9._+ -]{0,126}[A-Za-z0-9_+-])?");
     private static final int MAX_DOWNLOADS = 8;
     private final JavaRuntimeResolver javaRuntimeResolver;
+    private volatile java.util.function.Predicate<PlayerAccount> cheatPermission = account -> false;
+    private volatile java.util.function.Supplier<String> backendUrl = () -> "";
+    private final ElyByAuthService elyByAuthService = new ElyByAuthService();
 
     @FunctionalInterface
     interface JavaRuntimeResolver {
         Path resolve(int javaMajor, Consumer<String> onOutput, boolean allowDownloads) throws Exception;
+    }
+
+    /** Decides per account whether the in-game cheat modules are unlocked ({@code -Dvclient.cheats=true}). */
+    void setCheatPermission(java.util.function.Predicate<PlayerAccount> cheatPermission) {
+        this.cheatPermission = cheatPermission;
+    }
+
+    /** Backend address handed to the in-game mod ({@code -Dvclient.backend}) for the cosmetics catalog. */
+    void setBackendUrl(java.util.function.Supplier<String> backendUrl) {
+        this.backendUrl = backendUrl;
     }
 
     MinecraftLauncher() {
@@ -536,6 +549,10 @@ final class MinecraftLauncher {
                     : ensureAuthlibInjector(minecraftDirectory, onOutput);
             if (authlibInjector != null) command.add(authlibInjectorArgument(authlibInjector));
         }
+        if (cheatPermission.test(account)) command.add("-Dvclient.cheats=true");
+        command.addAll(skinArguments(account, offlineOnly, onOutput));
+        String backend = backendUrl.get();
+        if (backend != null && !backend.isBlank()) command.add("-Dvclient.backend=" + backend.strip());
         command.addAll(arguments(version.path("arguments").path("jvm"), substitutions));
         if (!version.path("arguments").path("jvm").isArray()) {
             command.add("-Djava.library.path=" + nativesDirectory);
@@ -620,6 +637,47 @@ final class MinecraftLauncher {
                     + (crashReport.isBlank() ? " No crash report was found; review the captured game output."
                     : " Crash report details follow:\n" + crashReport));
         }
+    }
+
+    /**
+     * Hands the account's current skin to the in-game mod. Vanilla only fetches the local player's
+     * profile once at start-up and never retries, so one failed request leaves Steve/Alex for the whole
+     * session. The mod applies this skin itself whenever vanilla did not resolve one.
+     */
+    private List<String> skinArguments(PlayerAccount account, boolean offlineOnly, Consumer<String> onOutput) {
+        if (account.type() != PlayerAccount.Type.ELY_BY) return List.of();
+        String skin = account.skinUrl();
+        String cape = account.capeUrl();
+        String model = "default";
+        if (offlineOnly) {
+            onOutput.accept("Ely.by skin: offline launch; using the last saved skin ("
+                    + (skin.isBlank() ? "none" : skin) + ").");
+        } else {
+            onOutput.accept("Ely.by login: signed in as " + account.name() + " (" + account.uuid() + ").");
+            try {
+                ElyByAuthService.SkinProfile profile = elyByAuthService.fetchSkinProfile(
+                        account.uuid(), account.name(), onOutput);
+                if (profile.hasSkin()) skin = profile.skinUrl();
+                if (!profile.capeUrl().isBlank()) cape = profile.capeUrl();
+                model = profile.model();
+            } catch (IOException e) {
+                onOutput.accept("Ely.by skin: could not refresh the skin, using the last saved one ("
+                        + (skin.isBlank() ? "none" : skin) + "): " + e.getMessage());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        List<String> arguments = new ArrayList<>();
+        if (!skin.isBlank()) {
+            arguments.add("-Dvclient.skin.url=" + skin);
+            arguments.add("-Dvclient.skin.model=" + model);
+            arguments.add("-Dvclient.skin.uuid=" + account.uuid().replace("-", ""));
+            if (!cape.isBlank()) arguments.add("-Dvclient.cape.url=" + cape);
+            onOutput.accept("Ely.by skin: passing skin to the game (model=" + model + ").");
+        } else {
+            onOutput.accept("Ely.by skin: this account has no skin equipped; the game will use the default skin.");
+        }
+        return arguments;
     }
 
     static void logCommandArguments(List<String> arguments, Consumer<String> onOutput) {

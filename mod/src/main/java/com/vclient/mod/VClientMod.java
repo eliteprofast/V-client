@@ -39,6 +39,7 @@ public final class VClientMod implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         VConfig.load();
+        com.vclient.mod.cosmetics.Cosmetics.init();
         if (CHEATS) {
             VConfig.setEnabled(Module.FREECAM, false);
             LOGGER.info("Hacker mode unlocked: X-Ray, Reach-Hits, Speed Hack and Freecam are available.");
@@ -88,6 +89,8 @@ public final class VClientMod implements ClientModInitializer {
             }
             zooming = zoomKeyDown;
         }
+
+        com.vclient.mod.cosmetics.Cosmetics.tick(client);
 
         if (CHEATS) tickCheats(client);
 

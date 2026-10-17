@@ -10,10 +10,14 @@
     "GameRendererMixin",
     "InGameHudMixin",
     "KeyboardInputMixin",
+    "LivingEntityRendererAccess",
     "LightmapTextureManagerMixin",
     "MinecraftClientMixin",
     "MouseMixin",
     "PlayerEntityMixin",
+    "PlayerEntityModelMixin",
+    "PlayerEntityRendererMixin",
+    "PlayerListEntryMixin",
     "ScreenMixin"
   ],
   "injectors": {

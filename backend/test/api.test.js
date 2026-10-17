@@ -163,3 +163,63 @@ test('Minecraft status ping parses a Server List Ping response', async () => {
   const down = await pingJava('127.0.0.1', 1);
   assert.equal(down.online, false);
 });
+
+test('cosmetics: admin publishes an item with an asset, players download it, premium needs a grant', async (t) => {
+  const { call, admin, base } = await start(t);
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(80, 7)]);
+
+  assert.equal((await call('POST', '/api/admin/cosmetics', { body: { id: 'x' } })).status, 401);
+  assert.equal((await call('GET', '/api/cosmetics/catalog')).json.items.length, 0);
+
+  const badAsset = await call('PUT', '/api/admin/cosmetics/assets/cape.png', { token: admin, raw: Buffer.from('not a png'), headers: { 'Content-Type': 'image/png' } });
+  assert.equal(badAsset.status, 400);
+  const asset = await call('PUT', '/api/admin/cosmetics/assets/royal.png', { token: admin, raw: png, headers: { 'Content-Type': 'image/png' } });
+  assert.equal(asset.status, 201);
+  assert.equal(asset.json.size, png.length);
+
+  const invalid = await call('POST', '/api/admin/cosmetics', { token: admin, body: { id: 'Bad Id', category: 'cape', name: 'x', definition: {} } });
+  assert.equal(invalid.status, 400);
+  const noSlot = await call('POST', '/api/admin/cosmetics', { token: admin, body: { id: 'anim', category: 'animated', name: 'x', definition: {} } });
+  assert.equal(noSlot.status, 400);
+
+  const created = await call('POST', '/api/admin/cosmetics', {
+    token: admin,
+    body: { id: 'royal_cape', category: 'cape', tier: 'premium', name: 'Royal Cape', definition: { texture: { asset: 'royal.png', width: 64, height: 32 } } },
+  });
+  assert.equal(created.status, 201);
+  assert.equal((await call('POST', '/api/admin/cosmetics', { token: admin, body: { id: 'royal_cape', category: 'cape', name: 'dup', definition: {} } })).status, 409);
+
+  const catalog = await call('GET', '/api/cosmetics/catalog');
+  assert.equal(catalog.json.schema, 1);
+  const item = catalog.json.items[0];
+  assert.equal(item.id, 'royal_cape');
+  assert.equal(item.tier, 'premium');
+  assert.equal(item.assets[0].file, 'royal.png');
+  assert.equal(item.assets[0].sha256, require('node:crypto').createHash('sha256').update(png).digest('hex'));
+
+  const again = await call('GET', '/api/cosmetics/catalog', { headers: { 'If-None-Match': catalog.headers.get('etag') } });
+  assert.equal(again.status, 304);
+
+  const download = await fetch(base + item.assets[0].url);
+  assert.equal(download.status, 200);
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()), png);
+  assert.equal((await call('GET', '/api/cosmetics/assets/missing.png')).status, 404);
+  assert.equal((await call('GET', '/api/cosmetics/assets/..%2Fsecret.png')).status, 404);
+
+  const uuid = '1331c81d33844eb6baf6a511c8298af3';
+  assert.deepEqual((await call('GET', `/api/cosmetics/owned/${uuid}`)).json.owned, []);
+  assert.equal((await call('POST', '/api/admin/cosmetics/grants', { token: admin, body: { uuid, cosmeticId: 'nope' } })).status, 404);
+  assert.equal((await call('POST', '/api/admin/cosmetics/grants', { token: admin, body: { uuid, cosmeticId: 'royal_cape' } })).status, 201);
+  assert.deepEqual((await call('GET', `/api/cosmetics/owned/${uuid}`)).json.owned, ['royal_cape']);
+  assert.equal((await call('GET', '/api/cosmetics/owned/not-a-uuid')).status, 400);
+
+  // Replacing the asset bumps the item version so clients download it again.
+  await call('PUT', '/api/admin/cosmetics/assets/royal.png', { token: admin, raw: Buffer.concat([png, Buffer.from('x')]), headers: { 'Content-Type': 'image/png' } });
+  assert.equal((await call('GET', '/api/cosmetics/catalog')).json.items[0].version, 2);
+
+  // Disabling hides it from the catalog and tells clients to drop it.
+  await call('PUT', '/api/admin/cosmetics/royal_cape', { token: admin, body: { enabled: false } });
+  const hidden = (await call('GET', '/api/cosmetics/catalog')).json;
+  assert.equal(hidden.items.length, 0);
+  assert.deepEqual(hidden.removed, ['royal_cape']);
+});

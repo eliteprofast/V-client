@@ -27,6 +27,7 @@ function buildConfig(overrides = {}) {
     port: int('PORT', 8080),
     dataDir,
     downloadsDir: path.join(dataDir, 'downloads'),
+    cosmeticsDir: path.join(dataDir, 'cosmetics'),
     websiteDir: path.resolve(env('WEBSITE_DIR', path.join(__dirname, '..', '..', 'website'))),
     tokenSecret: env('TOKEN_SECRET', ''),
     trustProxy: env('TRUST_PROXY', '0') === '1',

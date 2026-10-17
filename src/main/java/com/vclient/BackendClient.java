@@ -157,6 +157,20 @@ final class BackendClient {
         }
     }
 
+    /** The raw cosmetics catalog document (schema documented in docs/COSMETICS_API.md). */
+    JsonNode cosmeticsCatalog() throws IOException, InterruptedException {
+        return get("/api/cosmetics/catalog");
+    }
+
+    /** Ids of the premium/event cosmetics granted to the Minecraft account with this UUID. */
+    java.util.Set<String> ownedCosmetics(String uuid) throws IOException, InterruptedException {
+        java.util.Set<String> owned = new java.util.HashSet<>();
+        for (JsonNode id : get("/api/cosmetics/owned/" + encode(uuid.replace("-", ""))).path("owned")) {
+            owned.add(id.asText());
+        }
+        return owned;
+    }
+
     private Session session(JsonNode root) {
         JsonNode user = root.path("user");
         return new Session(root.path("token").asText(), user.path("username").asText(),

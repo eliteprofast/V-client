@@ -1,0 +1,200 @@
+{
+  "schema": 1,
+  "items": [
+    {
+      "id": "night_sky", "category": "cape", "tier": "free", "name": "Night Sky", "sort": 10,
+      "description": "The V-Client night sky, draped over your shoulders.",
+      "definition": { "texture": { "width": 64, "height": 32, "generator": { "type": "gradient", "colors": ["#0b1030", "#2c1d66", "#6b3fa0"] } } }
+    },
+    {
+      "id": "gold_stripes", "category": "cape", "tier": "free", "name": "Gold Stripes", "sort": 11,
+      "description": "Bold gold stripes on midnight blue.",
+      "definition": { "texture": { "width": 64, "height": 32, "generator": { "type": "stripes", "colors": ["#E6BD59", "#1a1933"], "size": 2 } } }
+    },
+    {
+      "id": "emerald", "category": "cape", "tier": "free", "name": "Emerald", "sort": 12,
+      "description": "Deep green fading to bright emerald.",
+      "definition": { "texture": { "width": 64, "height": 32, "generator": { "type": "gradient", "colors": ["#0f5132", "#2ecc71"] } } }
+    },
+    {
+      "id": "royal_cape", "category": "cape", "tier": "premium", "name": "Royal Cape", "sort": 13,
+      "description": "A velvet cape fit for the VSMP court. Premium.",
+      "definition": { "texture": { "width": 64, "height": 32, "generator": { "type": "gradient", "colors": ["#3a0d5c", "#9b1d3c", "#E6BD59"] } } }
+    },
+    {
+      "id": "aurora_cape", "category": "animated", "tier": "free", "name": "Aurora", "sort": 20,
+      "description": "A cape with a slow northern-lights shimmer.",
+      "definition": { "slot": "cape", "texture": { "width": 64, "height": 32, "frames": 16, "frameTicks": 2,
+        "generator": { "type": "shimmer", "colors": ["#1c2f6b", "#46f0c4"], "direction": "vertical" } } }
+    },
+    {
+      "id": "starfield_cape", "category": "animated", "tier": "free", "name": "Starfield", "sort": 21,
+      "description": "Twinkling stars across a black cape.",
+      "definition": { "slot": "cape", "texture": { "width": 64, "height": 32, "frames": 6, "frameTicks": 6,
+        "generator": { "type": "sparkle", "colors": ["#0a0a1e", "#ffffff"] } } }
+    },
+    {
+      "id": "halo_spin", "category": "animated", "tier": "free", "name": "Spinning Halo", "sort": 22,
+      "description": "A golden halo that slowly turns above your head.",
+      "definition": { "slot": "hat",
+        "texture": { "width": 64, "height": 64, "generator": { "type": "gradient", "colors": ["#fff1a8", "#E6BD59"] } },
+        "model": { "parts": [ { "bone": "head", "pivot": [0, 0, 0],
+          "cuboids": [
+            { "origin": [-4, -12, -4], "size": [8, 1, 1], "uv": [0, 0] },
+            { "origin": [-4, -12, 3], "size": [8, 1, 1], "uv": [0, 0] },
+            { "origin": [-4, -12, -3], "size": [1, 1, 6], "uv": [0, 0] },
+            { "origin": [3, -12, -3], "size": [1, 1, 6], "uv": [0, 0] } ],
+          "anim": { "axis": "y", "target": "rotation", "mode": "spin", "speed": 0.4 } } ] } }
+    },
+    {
+      "id": "angel_wings", "category": "wings", "tier": "free", "name": "Angel Wings", "sort": 30,
+      "description": "Soft white wings with a gentle flap.",
+      "definition": {
+        "texture": { "width": 64, "height": 64, "generator": { "type": "gradient", "colors": ["#ffffff", "#cdd8ff"] } },
+        "model": { "parts": [ { "bone": "body", "pivot": [2.5, 1, 2.4], "rotation": [0, -25, 0], "mirror": true,
+          "cuboids": [
+            { "origin": [0, -1, 0], "size": [12, 3, 1], "uv": [0, 0] },
+            { "origin": [0, 2, 0], "size": [14, 3, 1], "uv": [0, 0] },
+            { "origin": [0, 5, 0], "size": [12, 3, 1], "uv": [0, 0] },
+            { "origin": [0, 8, 0], "size": [9, 3, 1], "uv": [0, 0] },
+            { "origin": [0, 11, 0], "size": [6, 3, 1], "uv": [0, 0] } ],
+          "anim": { "axis": "y", "target": "rotation", "mode": "sine", "speed": 0.6, "amplitude": 18 } } ] } }
+    },
+    {
+      "id": "dragon_wings", "category": "wings", "tier": "free", "name": "Dragon Wings", "sort": 31,
+      "description": "Dark leathery wings with a slow beat.",
+      "definition": {
+        "texture": { "width": 64, "height": 64, "generator": { "type": "gradient", "colors": ["#2a0a0a", "#8b1a1a"] } },
+        "model": { "parts": [ { "bone": "body", "pivot": [2.5, 0, 2.4], "rotation": [0, -30, 0], "mirror": true,
+          "cuboids": [
+            { "origin": [0, -2, 0], "size": [18, 2, 1], "uv": [0, 0] },
+            { "origin": [2, 0, 0], "size": [15, 4, 1], "uv": [0, 0] },
+            { "origin": [4, 4, 0], "size": [12, 4, 1], "uv": [0, 0] },
+            { "origin": [6, 8, 0], "size": [8, 4, 1], "uv": [0, 0] },
+            { "origin": [8, 12, 0], "size": [4, 3, 1], "uv": [0, 0] } ],
+          "anim": { "axis": "y", "target": "rotation", "mode": "sine", "speed": 0.4, "amplitude": 14 } } ] } }
+    },
+    {
+      "id": "crown", "category": "hat", "tier": "free", "name": "Gold Crown", "sort": 40,
+      "description": "A little gold crown.",
+      "definition": {
+        "texture": { "width": 64, "height": 64, "generator": { "type": "gradient", "colors": ["#fff1a8", "#c99a2e"] } },
+        "model": { "parts": [ { "bone": "head", "pivot": [0, 0, 0],
+          "cuboids": [
+            { "origin": [-5, -10, -5], "size": [10, 2, 10], "uv": [0, 0] },
+            { "origin": [-5, -13, -5], "size": [2, 3, 2], "uv": [0, 0] },
+            { "origin": [3, -13, -5], "size": [2, 3, 2], "uv": [0, 0] },
+            { "origin": [-5, -13, 3], "size": [2, 3, 2], "uv": [0, 0] },
+            { "origin": [3, -13, 3], "size": [2, 3, 2], "uv": [0, 0] },
+            { "origin": [-1, -13, -5], "size": [2, 3, 2], "uv": [0, 0] },
+            { "origin": [-1, -13, 3], "size": [2, 3, 2], "uv": [0, 0] },
+            { "origin": [-5, -13, -1], "size": [2, 3, 2], "uv": [0, 0] },
+            { "origin": [3, -13, -1], "size": [2, 3, 2], "uv": [0, 0] } ] } ] } }
+    },
+    {
+      "id": "top_hat", "category": "hat", "tier": "free", "name": "Top Hat", "sort": 41,
+      "description": "Dapper.",
+      "definition": {
+        "texture": { "width": 64, "height": 64, "generator": { "type": "gradient", "colors": ["#15151f", "#33334a"] } },
+        "model": { "parts": [ { "bone": "head", "pivot": [0, 0, 0],
+          "cuboids": [
+            { "origin": [-6, -9, -6], "size": [12, 1, 12], "uv": [0, 0] },
+            { "origin": [-4, -17, -4], "size": [8, 8, 8], "uv": [0, 0] } ] } ] } }
+    },
+    {
+      "id": "cat_ears", "category": "hat", "tier": "free", "name": "Cat Ears", "sort": 42,
+      "description": "Two pointy ears.",
+      "definition": {
+        "texture": { "width": 64, "height": 64, "generator": { "type": "gradient", "colors": ["#f2c7d8", "#b78aa0"] } },
+        "model": { "parts": [ { "bone": "head", "pivot": [0, 0, 0],
+          "cuboids": [
+            { "origin": [-4, -11, -3], "size": [3, 3, 1], "uv": [0, 0] },
+            { "origin": [1, -11, -3], "size": [3, 3, 1], "uv": [0, 0] },
+            { "origin": [-3, -13, -3], "size": [1, 2, 1], "uv": [0, 0] },
+            { "origin": [2, -13, -3], "size": [1, 2, 1], "uv": [0, 0] } ] } ] } }
+    },
+    {
+      "id": "wizard_hat", "category": "hat", "tier": "free", "name": "Wizard Hat", "sort": 43,
+      "description": "A tall purple hat with a brim.",
+      "definition": {
+        "texture": { "width": 64, "height": 64, "generator": { "type": "gradient", "colors": ["#2a1450", "#6d3fb8"] } },
+        "model": { "parts": [ { "bone": "head", "pivot": [0, 0, 0],
+          "cuboids": [
+            { "origin": [-6, -9, -6], "size": [12, 1, 12], "uv": [0, 0] },
+            { "origin": [-4, -13, -4], "size": [8, 4, 8], "uv": [0, 0] },
+            { "origin": [-3, -17, -3], "size": [6, 4, 6], "uv": [0, 0] },
+            { "origin": [-2, -21, -2], "size": [4, 4, 4], "uv": [0, 0] } ] } ] } }
+    },
+    {
+      "id": "sparkle_trail", "category": "trail", "tier": "free", "name": "Sparkles", "sort": 50,
+      "description": "A glittering cloud follows you.",
+      "definition": { "trail": { "particle": "minecraft:end_rod", "rate": 2, "count": 1, "spread": [0.35, 0.9, 0.35],
+        "offset": [0, 0.2, 0], "velocity": [0, 0.01, 0] } }
+    },
+    {
+      "id": "hearts_trail", "category": "trail", "tier": "free", "name": "Hearts", "sort": 51,
+      "description": "Hearts float up around you.",
+      "definition": { "trail": { "particle": "minecraft:heart", "rate": 12, "count": 1, "spread": [0.4, 0.6, 0.4],
+        "offset": [0, 1.2, 0] } }
+    },
+    {
+      "id": "ember_trail", "category": "trail", "tier": "free", "name": "Embers", "sort": 52,
+      "description": "Small flames while you move.",
+      "definition": { "trail": { "particle": "minecraft:flame", "rate": 3, "count": 1, "spread": [0.25, 0.1, 0.25],
+        "offset": [0, 0.05, 0], "velocity": [0, 0.005, 0], "onlyMoving": true } }
+    },
+    {
+      "id": "gold_dust_trail", "category": "trail", "tier": "free", "name": "Gold Dust", "sort": 53,
+      "description": "A fine gold dust shimmer.",
+      "definition": { "trail": { "particle": "minecraft:dust", "color": "#E6BD59", "scale": 0.9, "rate": 1, "count": 1,
+        "spread": [0.3, 1.8, 0.3], "offset": [0, 0, 0] } }
+    },
+    {
+      "id": "soul_trail", "category": "trail", "tier": "premium", "name": "Soul Fire", "sort": 54,
+      "description": "Cold blue flames at your feet. Premium.",
+      "definition": { "trail": { "particle": "minecraft:soul_fire_flame", "rate": 2, "count": 1, "spread": [0.3, 0.1, 0.3],
+        "offset": [0, 0.05, 0], "velocity": [0, 0.01, 0], "onlyMoving": true } }
+    },
+    {
+      "id": "spooky_trail", "category": "trail", "tier": "event", "name": "Spooky Season", "sort": 55,
+      "description": "Limited-time Halloween trail.",
+      "startsAt": 1790812800, "endsAt": 1794787200,
+      "definition": { "trail": { "particle": "minecraft:witch", "rate": 2, "count": 1, "spread": [0.35, 0.8, 0.35],
+        "offset": [0, 0.2, 0], "velocity": [0, 0.02, 0] } }
+    },
+    {
+      "id": "wave", "category": "emote", "tier": "free", "name": "Wave", "sort": 60,
+      "description": "Say hello. Press the emote key (third person to see it).",
+      "definition": { "emote": { "duration": 50, "loop": false, "cancelOnMove": true, "tracks": [
+        { "part": "rightArm", "axis": "x", "ease": "smooth", "keys": [[0, 0], [8, -165], [42, -165], [50, 0]] },
+        { "part": "rightArm", "axis": "z", "ease": "smooth", "keys": [[8, 0], [14, 18], [20, -12], [26, 18], [32, -12], [38, 0]] } ] } }
+    },
+    {
+      "id": "dance", "category": "emote", "tier": "free", "name": "Dance", "sort": 61,
+      "description": "A loop. Moving or pressing the emote key stops it.",
+      "definition": { "emote": { "duration": 30, "loop": true, "cancelOnMove": true, "tracks": [
+        { "part": "body", "axis": "y", "ease": "smooth", "keys": [[0, 0], [8, 28], [15, 0], [23, -28], [30, 0]] },
+        { "part": "head", "axis": "y", "ease": "smooth", "keys": [[0, 0], [8, -28], [15, 0], [23, 28], [30, 0]] },
+        { "part": "rightArm", "axis": "x", "ease": "smooth", "keys": [[0, -150], [15, -60], [30, -150]] },
+        { "part": "leftArm", "axis": "x", "ease": "smooth", "keys": [[0, -60], [15, -150], [30, -60]] },
+        { "part": "rightLeg", "axis": "x", "ease": "smooth", "keys": [[0, 0], [8, 20], [15, 0], [23, -20], [30, 0]] },
+        { "part": "leftLeg", "axis": "x", "ease": "smooth", "keys": [[0, 0], [8, -20], [15, 0], [23, 20], [30, 0]] } ] } }
+    },
+    {
+      "id": "clap", "category": "emote", "tier": "free", "name": "Clap", "sort": 62,
+      "description": "Applause.",
+      "definition": { "emote": { "duration": 48, "loop": false, "cancelOnMove": true, "tracks": [
+        { "part": "rightArm", "axis": "x", "ease": "smooth", "keys": [[0, 0], [6, -75], [42, -75], [48, 0]] },
+        { "part": "leftArm", "axis": "x", "ease": "smooth", "keys": [[0, 0], [6, -75], [42, -75], [48, 0]] },
+        { "part": "rightArm", "axis": "y", "ease": "linear", "keys": [[6, 0], [10, -32], [14, 0], [18, -32], [22, 0], [26, -32], [30, 0], [34, -32], [38, 0], [42, -32], [48, 0]] },
+        { "part": "leftArm", "axis": "y", "ease": "linear", "keys": [[6, 0], [10, 32], [14, 0], [18, 32], [22, 0], [26, 32], [30, 0], [34, 32], [38, 0], [42, 32], [48, 0]] } ] } }
+    },
+    {
+      "id": "salute", "category": "emote", "tier": "free", "name": "Salute", "sort": 63,
+      "description": "A crisp salute.",
+      "definition": { "emote": { "duration": 40, "loop": false, "cancelOnMove": true, "tracks": [
+        { "part": "rightArm", "axis": "x", "ease": "smooth", "keys": [[0, 0], [6, -125], [32, -125], [40, 0]] },
+        { "part": "rightArm", "axis": "z", "ease": "smooth", "keys": [[0, 0], [6, 40], [32, 40], [40, 0]] } ] } }
+    }
+  ]
+}

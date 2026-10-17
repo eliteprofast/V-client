@@ -7,11 +7,13 @@ const { createStatusService } = require('./serverStatus');
 const publicRoutes = require('./routes/public');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const cosmeticsRoutes = require('./routes/cosmetics');
 
 /** Builds the Express app. Everything stateful (db, config) is injected so tests can run in memory. */
 function createApp(config, options = {}) {
   const db = options.db || openDatabase(options.inMemory ? ':memory:' : config.dataDir);
   fs.mkdirSync(config.downloadsDir, { recursive: true });
+  fs.mkdirSync(config.cosmeticsDir, { recursive: true });
   const tokens = createTokens(loadSecret(config));
   const status = options.statusService || createStatusService(config.server);
   const ctx = { config, db, tokens, status, now: () => Math.floor(Date.now() / 1000) };
@@ -38,7 +40,9 @@ function createApp(config, options = {}) {
     : express.json({ limit: '64kb' })(req, res, next)));
 
   app.use('/api', rateLimit({ windowMs: 60_000, max: 240, bucket: 'api' }), publicRoutes(ctx));
+  app.use('/api/cosmetics', cosmeticsRoutes(ctx));
   app.use('/api/auth', authRoutes(ctx));
+  app.use('/api/admin/cosmetics', cosmeticsRoutes.admin(ctx));
   app.use('/api/admin', adminRoutes(ctx));
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 

@@ -64,7 +64,7 @@ import java.util.function.Consumer;
 
 public final class LauncherApp extends Application {
     private enum Page {
-        HOME, LIBRARY, MODS, BOOST, WARDROBE, FRIENDS, NEWS, LOGS, CONSOLE, SETTINGS, DISCORD
+        HOME, LIBRARY, MODS, BOOST, WARDROBE, COSMETICS, FRIENDS, NEWS, LOGS, CONSOLE, SETTINGS, DISCORD
     }
 
     private record VersionChoice(String id, String label, String status,
@@ -139,6 +139,7 @@ public final class LauncherApp extends Application {
             return javaRuntimeManager.resolve(selectedMajor, onOutput, allowDownloads);
         });
         gameLauncher.setCheatPermission(settings::cheatsEnabled);
+        gameLauncher.setBackendUrl(() -> BackendClient.resolveUrl(settings.backendUrl()));
         accounts.addAll(accountStore.load());
         localFriends.addAll(friendsStore.load());
         account = accounts.stream().filter(saved -> saved.id().equals(settings.lastAccountId()))
@@ -604,6 +605,163 @@ public final class LauncherApp extends Application {
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
         loadPreviews(account, skin, cape, description, () -> account);
+    }
+
+    private void showCosmetics() {
+        activePage = Page.COSMETICS;
+        settingsPage = false;
+        updateNavigationState();
+        StackPane root = baseLayout();
+        VBox content = pageContent("Your look", "Cosmetics",
+                "Capes, wings, hats, emotes, animated pieces and trails. What you equip here is what you wear in game. "
+                        + "Open the in-game menu with K for a live 3D preview. Cosmetics are visual only.");
+        Path configFile = CosmeticsStore.configFile(settings.minecraftDirectory());
+        BackendClient client = backend();
+        Label status = label("Loading cosmetics...", 12, MUTED);
+        VBox list = new VBox(8);
+        HBox tabs = new HBox(6);
+        HBox tiers = new HBox(6);
+        List<CosmeticsStore.Item> items = new ArrayList<>();
+        java.util.Set<String> owned = new java.util.HashSet<>();
+        String[] selectedCategory = {"cape"};
+        String[] selectedTier = {""};
+        Runnable[] render = new Runnable[1];
+
+        render[0] = () -> {
+            long now = System.currentTimeMillis() / 1000;
+            Map<String, String> equipped = CosmeticsStore.equipped(configFile);
+            tabs.getChildren().clear();
+            for (String category : CosmeticsStore.CATEGORIES) {
+                Button tab = button(categoryLabel(category), category.equals(selectedCategory[0]) ? ACCENT : "#292642", 10);
+                tab.setOnAction(event -> {
+                    selectedCategory[0] = category;
+                    render[0].run();
+                });
+                tabs.getChildren().add(tab);
+            }
+            tiers.getChildren().clear();
+            for (String tier : List.of("", "free", "premium", "event")) {
+                Button chip = button(tier.isEmpty() ? "All" : Character.toUpperCase(tier.charAt(0)) + tier.substring(1),
+                        tier.equals(selectedTier[0]) ? ACCENT : "#292642", 10);
+                chip.setOnAction(event -> {
+                    selectedTier[0] = tier;
+                    render[0].run();
+                });
+                tiers.getChildren().add(chip);
+            }
+            list.getChildren().clear();
+            int shown = 0;
+            for (CosmeticsStore.Item item : items) {
+                if (!item.category().equals(selectedCategory[0])
+                        || (!selectedTier[0].isEmpty() && !item.tier().equals(selectedTier[0]))) continue;
+                shown++;
+                boolean unlocked = CosmeticsStore.unlocked(item, owned, now);
+                boolean isEquipped = item.id().equals(equipped.get(item.slot()));
+                Label name = label(item.name(), 14, unlocked ? "#f3f6fc" : "#8e8eb2");
+                String tierColor = switch (item.tier()) {
+                    case "free" -> "#7cf29a";
+                    case "event" -> "#ff8fd8";
+                    default -> ACCENT;
+                };
+                Label tag = label(item.tier().toUpperCase() + "  ·  " + item.slot().charAt(0)
+                        + item.slot().substring(1).toLowerCase(), 10, tierColor);
+                Label description = label(item.description(), 11, MUTED);
+                description.setWrapText(true);
+                VBox text = new VBox(3, name, tag, description);
+                HBox.setHgrow(text, Priority.ALWAYS);
+                Button action = button(isEquipped ? "UNEQUIP" : unlocked ? "EQUIP"
+                        : item.tier().equals("premium") ? "PREMIUM" : "LOCKED",
+                        isEquipped ? "#482332" : unlocked ? ACCENT : "#2a2a3a", 10);
+                action.setMinWidth(92);
+                action.setDisable(!unlocked && !isEquipped);
+                action.setOnAction(event -> {
+                    try {
+                        if (isEquipped) CosmeticsStore.unequip(configFile, item.slot());
+                        else CosmeticsStore.equip(configFile, item.slot(), item.id());
+                        status.setText((isEquipped ? "Unequipped " : "Equipped ") + item.name()
+                                + ". It shows the next time you start the game.");
+                        appendLog("Cosmetics: " + (isEquipped ? "unequipped " : "equipped ") + item.id() + ".");
+                    } catch (IOException e) {
+                        status.setText("Could not save cosmetics: " + e.getMessage());
+                    }
+                    render[0].run();
+                });
+                HBox row = new HBox(14, text, action);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.setPadding(new Insets(12, 14, 12, 14));
+                row.setStyle("-fx-background-color: rgba(15, 16, 39, 0.84); -fx-background-radius: 10; -fx-border-radius: 10;"
+                        + " -fx-border-color: " + (isEquipped ? "rgba(230, 189, 89, 0.7)" : "rgba(170, 151, 207, 0.24)") + ";");
+                list.getChildren().add(row);
+            }
+            if (shown == 0) list.getChildren().add(label("Nothing here yet.", 12, MUTED));
+        };
+
+        Button refresh = button("REFRESH", "#292642", 10);
+        Button clear = button("UNEQUIP ALL", "#482332", 10);
+        clear.setOnAction(event -> {
+            try {
+                for (String slot : List.of("CAPE", "WINGS", "HAT", "TRAIL", "EMOTE")) {
+                    CosmeticsStore.unequip(configFile, slot);
+                }
+                status.setText("Everything unequipped.");
+            } catch (IOException e) {
+                status.setText("Could not save cosmetics: " + e.getMessage());
+            }
+            render[0].run();
+        });
+        Runnable load = () -> {
+            status.setText("Loading cosmetics...");
+            String uuid = account == null ? "" : account.uuid();
+            boolean online = client.configured() && !settings.offlineMode();
+            boolean checkOwned = account != null && account.type() != PlayerAccount.Type.OFFLINE && !uuid.isBlank();
+            executor.execute(() -> {
+                java.util.Set<String> ownedNow = new java.util.HashSet<>();
+                String message;
+                com.fasterxml.jackson.databind.JsonNode remote = null;
+                try {
+                    if (online) {
+                        remote = client.cosmeticsCatalog();
+                        if (checkOwned) ownedNow.addAll(client.ownedCosmetics(uuid));
+                    }
+                    message = online ? "Online catalog loaded." : "Showing the built-in cosmetics"
+                            + (client.configured() ? " (offline mode)." : " (set the backend address on the News page for more).");
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    message = "Could not reach the cosmetics server (" + e.getMessage() + "); showing the built-in cosmetics.";
+                }
+                List<CosmeticsStore.Item> loaded = CosmeticsStore.merge(CosmeticsStore.builtIn(), remote);
+                String finalMessage = message + " " + loaded.size() + " items.";
+                Platform.runLater(() -> {
+                    items.clear();
+                    items.addAll(loaded);
+                    owned.clear();
+                    owned.addAll(ownedNow);
+                    status.setText(finalMessage);
+                    render[0].run();
+                });
+            });
+        };
+        refresh.setOnAction(event -> load.run());
+
+        VBox controls = card();
+        controls.getChildren().addAll(tabs, tiers, new HBox(10, refresh, clear), status);
+        content.getChildren().addAll(controls, list,
+                label("The cosmetics file is shared with the game: " + configFile, 10, MUTED));
+        setPageContent(root, content);
+        stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+        render[0].run();
+        load.run();
+    }
+
+    private static String categoryLabel(String category) {
+        return switch (category) {
+            case "cape" -> "Capes";
+            case "wings" -> "Wings";
+            case "hat" -> "Hats";
+            case "emote" -> "Emotes";
+            case "animated" -> "Animated";
+            default -> "Trails";
+        };
     }
 
     private void showFriends() {
@@ -1680,6 +1838,7 @@ public final class LauncherApp extends Application {
             case MODS -> showMods();
             case BOOST -> showBoost();
             case WARDROBE -> showWardrobe();
+            case COSMETICS -> showCosmetics();
             case FRIENDS -> showFriends();
             case NEWS -> showNews();
             case LOGS -> showLogs();
@@ -1706,6 +1865,7 @@ public final class LauncherApp extends Application {
             case MODS -> "✚\nMods";
             case BOOST -> "ϟ\nBoost";
             case WARDROBE -> "♧\nWardrobe";
+            case COSMETICS -> "✦\nCosmetics";
             case FRIENDS -> "♟\nFriends";
             case NEWS -> "✉\nNews";
             case LOGS -> "⚠\nLogs";
@@ -2251,10 +2411,11 @@ public final class LauncherApp extends Application {
     }
 
     private void loadElyByTextures(PlayerAccount signedIn) {
-        appendLog("Ely.by sign-in succeeded. Loading skin and cape in the background...");
+        appendLog("Ely.by profile: loading skin and cape for " + signedIn.name() + " in the background...");
         CompletableFuture.supplyAsync(() -> {
             try {
-                return elyByAuthService.loadTextures(signedIn);
+                return elyByAuthService.loadTextures(signedIn,
+                        line -> Platform.runLater(() -> appendLog(line)));
             } catch (IOException | InterruptedException e) {
                 if (e instanceof InterruptedException) Thread.currentThread().interrupt();
                 throw new java.util.concurrent.CompletionException(e);
@@ -2277,6 +2438,12 @@ public final class LauncherApp extends Application {
                 }
             }
             if (savedIndex < 0) return;
+            PlayerAccount saved = accounts.get(savedIndex);
+            if (saved.skinUrl().equals(profile.skinUrl()) && saved.capeUrl().equals(profile.capeUrl())) {
+                appendLog("Ely.by skin is up to date.");
+                if (account != null && account.id().equals(profile.id()) && avatar != null) loadAvatar(account, avatar);
+                return;
+            }
             if (accountPersistenceInProgress) {
                 appendLog("The Ely.by skin/cape loaded, but another account update is in progress; "
                         + "the profile preview will update next time you sign in.");
@@ -2307,6 +2474,7 @@ public final class LauncherApp extends Application {
         }
         if (avatar != null) loadAvatar(selected, avatar);
         if (status != null) status.setText(selected.name() + " selected. Type: " + selected.type().label() + ".");
+        if (selected.type() == PlayerAccount.Type.ELY_BY && !settings.offlineMode()) loadElyByTextures(selected);
     }
 
     private void updateAccountControls() {
@@ -2540,26 +2708,34 @@ public final class LauncherApp extends Application {
         });
     }
 
+    private final SkinImageCache skinImageCache = new SkinImageCache(SkinImageCache.defaultDirectory(),
+            line -> Platform.runLater(() -> appendLog(line)));
+
     private Image downloadImage(String address) {
-        if (address == null || address.isBlank() || settings.offlineMode()) return null;
+        if (address == null || address.isBlank()) return null;
         try {
             URI uri = URI.create(address);
             if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) return null;
-            HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(20))
-                    .header("Accept", "image/png")
-                    .GET().build();
-            HttpResponse<byte[]> response = IMAGE_HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            if (response.statusCode() < 200 || response.statusCode() >= 300
-                    || response.body().length > 4_000_000) return null;
-            String contentType = response.headers().firstValue("Content-Type").orElse("");
-            if (!contentType.toLowerCase(java.util.Locale.ROOT).startsWith("image/")) return null;
-            return new Image(new ByteArrayInputStream(response.body()), 0, 0, true, true);
+            byte[] bytes = skinImageCache.load(address, this::fetchImageBytes, !settings.offlineMode());
+            return bytes == null ? null : new Image(new ByteArrayInputStream(bytes), 0, 0, true, true);
         } catch (IllegalArgumentException | IOException e) {
             return null;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return null;
         }
+    }
+
+    private byte[] fetchImageBytes(String address) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(address)).timeout(Duration.ofSeconds(20))
+                .header("Accept", "image/png")
+                .GET().build();
+        HttpResponse<byte[]> response = IMAGE_HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
+        if (response.statusCode() < 200 || response.statusCode() >= 300
+                || response.body().length > SkinImageCache.MAX_BYTES) return null;
+        String contentType = response.headers().firstValue("Content-Type").orElse("");
+        if (!contentType.toLowerCase(java.util.Locale.ROOT).startsWith("image/")) return null;
+        return response.body();
     }
 
     private void saveSettings() {

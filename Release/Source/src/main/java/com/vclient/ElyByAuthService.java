@@ -16,15 +16,18 @@ import java.net.URLEncoder;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 
 final class ElyByAuthService {
     private static final String AUTH_URL = "https://authserver.ely.by/auth/";
     private static final String TEXTURE_URL = "https://skinsystem.ely.by/textures/";
+    private static final String SESSION_PROFILE_URL =
+            "https://authserver.ely.by/api/authlib-injector/sessionserver/session/minecraft/profile/";
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final HttpClient HTTP = PlatformTls.httpClientBuilder(Duration.ofSeconds(20)).build();
 
     CompletableFuture<PlayerAccount> signIn(String username, char[] password, Executor executor,
-                                           java.util.function.Consumer<String> onProgress) {
+                                           Consumer<String> onProgress) {
         char[] secret = password.clone();
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -47,8 +50,7 @@ final class ElyByAuthService {
                 account.clientToken(), account);
     }
 
-    private PlayerAccount authenticate(String username, String password,
-                                       java.util.function.Consumer<String> onProgress)
+    private PlayerAccount authenticate(String username, String password, Consumer<String> onProgress)
             throws IOException, InterruptedException {
         if (username == null || username.isBlank() || password.isBlank()) {
             throw new IOException("Enter your Ely.by username/email and password.");
@@ -86,8 +88,13 @@ final class ElyByAuthService {
     }
 
     PlayerAccount loadTextures(PlayerAccount account) throws IOException, InterruptedException {
-        Textures textures = fetchTextures(account.name());
-        if (textures.skin().isBlank() && textures.cape().isBlank() && textures.property() == null) {
+        return loadTextures(account, ignored -> {});
+    }
+
+    PlayerAccount loadTextures(PlayerAccount account, Consumer<String> log)
+            throws IOException, InterruptedException {
+        SkinProfile profile = fetchSkinProfile(account.uuid(), account.name(), log);
+        if (profile.skinUrl().isBlank() && profile.capeUrl().isBlank() && profile.property() == null) {
             return account;
         }
         com.fasterxml.jackson.databind.node.ArrayNode userProperties = JSON.createArrayNode();
@@ -99,59 +106,111 @@ final class ElyByAuthService {
                 if (!"textures".equals(property.path("name").asText())) userProperties.add(property);
             }
         }
-        if (textures.property() != null) userProperties.add(textures.property());
+        if (profile.property() != null) userProperties.add(profile.property());
         return new PlayerAccount(account.id(), account.type(), account.name(), account.uuid(),
                 account.accessToken(), account.refreshToken(), account.clientToken(), account.xuid(),
                 userProperties.toString(),
-                textures.skin().isBlank() ? account.skinUrl() : textures.skin(),
-                textures.cape().isBlank() ? account.capeUrl() : textures.cape());
+                profile.skinUrl().isBlank() ? account.skinUrl() : profile.skinUrl(),
+                profile.capeUrl().isBlank() ? account.capeUrl() : profile.capeUrl());
+    }
+
+    /** A player's current Ely.by textures. {@code model} is {@code "slim"} or {@code "default"}. */
+    record SkinProfile(String skinUrl, String capeUrl, String model, JsonNode property, String source) {
+        static final SkinProfile EMPTY = new SkinProfile("", "", "default", null, "none");
+
+        boolean hasSkin() {
+            return !skinUrl.isBlank();
+        }
+    }
+
+    /**
+     * Looks the player up by UUID on the Ely.by session server (the endpoint the game's authlib-injector
+     * asks), then falls back to the skin system by name. UUID comes first because the name lookup finds
+     * nothing right after a rename and is case sensitive on some paths.
+     */
+    SkinProfile fetchSkinProfile(String uuid, String name, Consumer<String> log)
+            throws IOException, InterruptedException {
+        String compactUuid = uuid == null ? "" : uuid.replace("-", "").toLowerCase(java.util.Locale.ROOT);
+        IOException sessionFailure = null;
+        if (compactUuid.matches("[0-9a-f]{32}")) {
+            log.accept("Ely.by skin: requesting profile by UUID " + compactUuid + ".");
+            try {
+                HttpResponse<String> response = get(SESSION_PROFILE_URL + compactUuid + "?unsigned=false");
+                log.accept("Ely.by skin: session server returned HTTP " + response.statusCode() + ".");
+                if (response.statusCode() == 200) {
+                    SkinProfile profile = parseSessionProfile(JSON.readTree(response.body()));
+                    log.accept("Ely.by skin: profile loaded (skin="
+                            + (profile.hasSkin() ? profile.skinUrl() : "none")
+                            + ", model=" + profile.model()
+                            + ", cape=" + (profile.capeUrl().isBlank() ? "none" : profile.capeUrl()) + ").");
+                    if (profile.hasSkin() || !profile.capeUrl().isBlank()) return profile;
+                } else if (response.statusCode() != 204 && response.statusCode() != 404) {
+                    sessionFailure = new IOException("Ely.by session server answered HTTP "
+                            + response.statusCode() + ".");
+                }
+            } catch (IOException e) {
+                sessionFailure = e;
+                log.accept("Ely.by skin: session profile lookup failed: " + PlatformTls.describeFailure(e));
+            }
+        } else {
+            log.accept("Ely.by skin: account UUID is not valid; falling back to a name lookup.");
+        }
+        if (name == null || name.isBlank()) {
+            if (sessionFailure != null) throw sessionFailure;
+            return SkinProfile.EMPTY;
+        }
+        log.accept("Ely.by skin: requesting textures by name " + name + ".");
+        HttpResponse<String> response;
+        try {
+            response = get(TEXTURE_URL + URLEncoder.encode(name, StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw sessionFailure != null ? sessionFailure : e;
+        }
+        log.accept("Ely.by skin: skin system returned HTTP " + response.statusCode() + ".");
+        if (response.statusCode() == 204 || response.statusCode() == 404) return SkinProfile.EMPTY;
+        JsonNode textures = readResponse(response);
+        Textures direct = parseTextureResponse(textures);
+        String model = normalizeModel(textures.path("SKIN").path("metadata").path("model").asText(""));
+        log.accept("Ely.by skin: skin system result skin=" + (direct.skin().isBlank() ? "none" : direct.skin())
+                + ", model=" + model + ".");
+        return new SkinProfile(direct.skin(), direct.cape(), model, null, "skinsystem");
+    }
+
+    /** Parses a session-server profile response into the skin, cape and arm model it describes. */
+    static SkinProfile parseSessionProfile(JsonNode profile) throws IOException {
+        for (JsonNode candidate : profile.path("properties")) {
+            if (!"textures".equals(candidate.path("name").asText())) continue;
+            JsonNode decoded;
+            try {
+                decoded = JSON.readTree(java.util.Base64.getDecoder().decode(candidate.path("value").asText("")));
+            } catch (IllegalArgumentException e) {
+                throw new IOException("The Ely.by profile contains an invalid texture property.", e);
+            }
+            JsonNode textures = decoded.path("textures");
+            return new SkinProfile(
+                    secureTextureUrl(textures.path("SKIN").path("url").asText("")),
+                    secureTextureUrl(textures.path("CAPE").path("url").asText("")),
+                    normalizeModel(textures.path("SKIN").path("metadata").path("model").asText("")),
+                    candidate, "session");
+        }
+        return SkinProfile.EMPTY;
+    }
+
+    static String normalizeModel(String model) {
+        return "slim".equalsIgnoreCase(model) || "alex".equalsIgnoreCase(model) ? "slim" : "default";
+    }
+
+    private static HttpResponse<String> get(String url) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(15))
+                .header("Accept", "application/json").GET().build();
+        try {
+            return HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw JavaRuntimeManager.explainTlsFailure(url, e);
+        }
     }
 
     private record Textures(String skin, String cape, JsonNode property) {}
-
-    private static Textures fetchTextures(String username) throws IOException, InterruptedException {
-        String encodedName = URLEncoder.encode(username, StandardCharsets.UTF_8);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(TEXTURE_URL + encodedName))
-                .timeout(Duration.ofSeconds(15)).GET().build();
-        HttpResponse<String> response;
-        try {
-            response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (IOException e) {
-            throw JavaRuntimeManager.explainTlsFailure(request.uri().toString(), e);
-        }
-        Textures directTextures = response.statusCode() == 204
-                ? new Textures("", "", null) : parseTextureResponse(readResponse(response));
-        JsonNode property = null;
-        HttpRequest profileRequest = HttpRequest.newBuilder(URI.create(
-                        "https://skinsystem.ely.by/profile/" + encodedName + "?unsigned=false"))
-                .timeout(Duration.ofSeconds(15)).GET().build();
-        HttpResponse<String> profileResponse;
-        try {
-            profileResponse = HTTP.send(profileRequest, HttpResponse.BodyHandlers.ofString());
-        } catch (IOException e) {
-            throw JavaRuntimeManager.explainTlsFailure(profileRequest.uri().toString(), e);
-        }
-        String skin = directTextures.skin();
-        String cape = directTextures.cape();
-        if (profileResponse.statusCode() >= 200 && profileResponse.statusCode() < 300) {
-            JsonNode profile = readResponse(profileResponse);
-            for (JsonNode candidate : profile.path("properties")) {
-                if ("textures".equals(candidate.path("name").asText())) {
-                    property = candidate;
-                    if (skin.isBlank()) {
-                        String encodedProperties = candidate.path("value").asText("");
-                        skin = secureTextureUrl(PlayerAccount.textureUrl(encodedProperties, "SKIN"));
-                    }
-                    if (cape.isBlank()) {
-                        String encodedProperties = candidate.path("value").asText("");
-                        cape = secureTextureUrl(PlayerAccount.textureUrl(encodedProperties, "CAPE"));
-                    }
-                    if (!skin.isBlank() && !cape.isBlank()) break;
-                }
-            }
-        }
-        return new Textures(skin, cape, property);
-    }
 
     static Textures parseTextureResponse(JsonNode textures) {
         String skin = secureTextureUrl(textures.path("SKIN").path("url").asText(""));
@@ -159,7 +218,8 @@ final class ElyByAuthService {
         return new Textures(skin, cape, null);
     }
 
-    private static String secureTextureUrl(String value) {
+    /** Ely.by serves textures over plain http; the launcher and the game both accept the https form. */
+    static String secureTextureUrl(String value) {
         if (value.isBlank()) return "";
         URI uri;
         try {
@@ -177,8 +237,7 @@ final class ElyByAuthService {
         return "https".equalsIgnoreCase(uri.getScheme()) ? uri.toString() : "";
     }
 
-    private static JsonNode send(String endpoint, ObjectNode body,
-                                 java.util.function.Consumer<String> onProgress)
+    private static JsonNode send(String endpoint, ObjectNode body, Consumer<String> onProgress)
             throws IOException, InterruptedException {
         URI uri = URI.create(endpoint);
         HttpRequest request = HttpRequest.newBuilder(uri)

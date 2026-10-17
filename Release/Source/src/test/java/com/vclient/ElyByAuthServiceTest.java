@@ -49,6 +49,48 @@ final class ElyByAuthServiceTest {
         assertTrue(error.getMessage().contains("unexpected client token"));
     }
 
+    @Test
+    void sessionProfileYieldsHttpsSkinCapeAndModel() throws Exception {
+        String textures = "{\"textures\":{\"SKIN\":{\"url\":\"http://ely.by/storage/skins/abc.png\","
+                + "\"metadata\":{\"model\":\"slim\"}},\"CAPE\":{\"url\":\"http://ely.by/storage/capes/def.png\"}}}";
+        ObjectNode profile = JSON.createObjectNode();
+        ObjectNode property = profile.putArray("properties").addObject();
+        property.put("name", "textures");
+        property.put("value", java.util.Base64.getEncoder().encodeToString(
+                textures.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        ElyByAuthService.SkinProfile parsed = ElyByAuthService.parseSessionProfile(profile);
+
+        assertEquals("https://ely.by/storage/skins/abc.png", parsed.skinUrl());
+        assertEquals("https://ely.by/storage/capes/def.png", parsed.capeUrl());
+        assertEquals("slim", parsed.model());
+        assertTrue(parsed.hasSkin());
+    }
+
+    @Test
+    void sessionProfileWithoutTexturesIsEmptyAndDefaultModel() throws Exception {
+        ElyByAuthService.SkinProfile parsed = ElyByAuthService.parseSessionProfile(JSON.createObjectNode());
+
+        assertEquals("", parsed.skinUrl());
+        assertEquals("default", parsed.model());
+    }
+
+    @Test
+    void modelNamesAreNormalized() {
+        assertEquals("slim", ElyByAuthService.normalizeModel("slim"));
+        assertEquals("slim", ElyByAuthService.normalizeModel("ALEX"));
+        assertEquals("default", ElyByAuthService.normalizeModel(""));
+        assertEquals("default", ElyByAuthService.normalizeModel("steve"));
+    }
+
+    @Test
+    void textureUrlsOutsideElyByAreRejectedUnlessHttps() {
+        assertEquals("https://ely.by/a.png", ElyByAuthService.secureTextureUrl("http://ely.by/a.png"));
+        assertEquals("https://textures.example/a.png", ElyByAuthService.secureTextureUrl("https://textures.example/a.png"));
+        assertEquals("", ElyByAuthService.secureTextureUrl("http://example.com/a.png"));
+        assertEquals("", ElyByAuthService.secureTextureUrl("not a url"));
+    }
+
     private static ObjectNode authenticatedResponse() {
         ObjectNode response = JSON.createObjectNode();
         response.put("accessToken", "new-token");

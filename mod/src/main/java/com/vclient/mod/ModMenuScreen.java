@@ -36,6 +36,7 @@ public final class ModMenuScreen extends Screen {
     private Area editButton;
     private Area resetButton;
     private Area doneButton;
+    private Area cosmeticsButton;
 
     public ModMenuScreen() {
         super(Text.literal("V-Client Mods"));
@@ -56,10 +57,11 @@ public final class ModMenuScreen extends Screen {
         scroll = Math.clamp(scroll, 0, maxScroll());
 
         int buttonY = panelY + panelHeight - 12 - BUTTON_HEIGHT;
-        int buttonWidth = (panelWidth - 24 - CARD_GAP * 2) / 3;
+        int buttonWidth = (panelWidth - 24 - CARD_GAP * 3) / 4;
         editButton = new Area(panelX + 12, buttonY, buttonWidth, BUTTON_HEIGHT);
         resetButton = new Area(editButton.x() + buttonWidth + CARD_GAP, buttonY, buttonWidth, BUTTON_HEIGHT);
-        doneButton = new Area(resetButton.x() + buttonWidth + CARD_GAP, buttonY, buttonWidth, BUTTON_HEIGHT);
+        cosmeticsButton = new Area(resetButton.x() + buttonWidth + CARD_GAP, buttonY, buttonWidth, BUTTON_HEIGHT);
+        doneButton = new Area(cosmeticsButton.x() + buttonWidth + CARD_GAP, buttonY, buttonWidth, BUTTON_HEIGHT);
     }
 
     private int maxScroll() {
@@ -118,6 +120,7 @@ public final class ModMenuScreen extends Screen {
 
         drawButton(context, editButton, "EDIT HUD", 0xFF292642, mouseX, mouseY);
         drawButton(context, resetButton, "RESET HUD", 0xFF482332, mouseX, mouseY);
+        drawButton(context, cosmeticsButton, "COSMETICS", 0xFF3A2D66, mouseX, mouseY);
         drawButton(context, doneButton, "DONE", Hud.ACCENT, mouseX, mouseY);
     }
 
@@ -193,6 +196,10 @@ public final class ModMenuScreen extends Screen {
         }
         if (resetButton.contains(x, y)) {
             VConfig.resetPositions();
+            return true;
+        }
+        if (cosmeticsButton.contains(x, y)) {
+            com.vclient.mod.cosmetics.Cosmetics.openMenu(client, this);
             return true;
         }
         if (doneButton.contains(x, y)) {

@@ -54,10 +54,12 @@ Public (no sign-in):
 | `GET /api/launcher/releases` | Latest published release per platform (used by the website) |
 | `POST /api/stats/event` | Anonymous usage counter `{ installId, platform, version, event }` |
 | `GET /download/windows`, `/download/android` | Redirect to the newest published installer |
+| `GET /api/cosmetics/catalog` | In-game cosmetics (capes, wings, hats, emotes, trails) with `ETag`; assets at `/api/cosmetics/assets/:file` |
+| `GET /api/cosmetics/owned/:uuid` | Premium/event cosmetics a player has been granted |
 
 Accounts (`Authorization: Bearer <token>`): `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `PUT /api/auth/profile`, `PUT /api/auth/password`. Passwords are hashed with scrypt; auth endpoints are rate limited.
 
-Management API (admin role only; there is no web panel, use curl or any HTTP client): `GET/POST/PUT/DELETE /api/admin/news`, `/api/admin/announcements`, `/api/admin/releases` (+ `PUT /api/admin/releases/:id/file?ext=.apk` with the raw installer as the body), `GET /api/admin/users`, `GET /api/admin/stats`.
+Management API (admin role only; there is no web panel, use curl or any HTTP client): `GET/POST/PUT/DELETE /api/admin/news`, `/api/admin/announcements`, `/api/admin/releases` (+ `PUT /api/admin/releases/:id/file?ext=.apk` with the raw installer as the body), `GET /api/admin/users`, `GET /api/admin/stats`, and `/api/admin/cosmetics` (items, PNG assets, per-player grants; see [docs/COSMETICS_API.md](../docs/COSMETICS_API.md)).
 
 ## Publishing an update
 

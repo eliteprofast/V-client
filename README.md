@@ -14,7 +14,8 @@ V-client/
 
 | Piece | What it gives players |
 | --- | --- |
-| Windows launcher | Play / one-click **JOIN OUR SMP**, version selector, Ely.by / Microsoft / offline accounts, RAM + Java settings, **News** page, **Error logs** page, live VSMP status, automatic updates |
+| Windows launcher | Play / one-click **JOIN OUR SMP**, **Cosmetics** page, version selector, Ely.by / Microsoft / offline accounts, RAM + Java settings, **News** page, **Error logs** page, live VSMP status, automatic updates |
+| In-game mod | Right Shift menu with HUD modules, plus a **Cosmetics** menu (press K): capes, wings, hats, emotes, animated pieces and particle trails with live preview, Free / Premium / Event tiers, and a server-driven catalog ([docs/COSMETICS_API.md](docs/COSMETICS_API.md)) |
 | Android app | **PLAY VSMP** (opens Minecraft Bedrock and connects), server status + player count, news, V-Client account, Discord/website buttons, in-app updates |
 | Backend | One API for both apps and the site: accounts, news, announcements, launcher version checks and installer hosting, VSMP status (Java + Bedrock ping), anonymous usage statistics |
 | Website | Download buttons for `.exe` and `.apk`, features, VSMP status, news |
