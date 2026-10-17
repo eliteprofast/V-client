@@ -25,9 +25,24 @@ public final class VClientMod implements ClientModInitializer {
     private static double lastZ;
     private static double speed;
 
+    /** Set by the launcher only for an admin account that chose Hacker / Cheater. */
+    private static final boolean CHEATS = Boolean.getBoolean("vclient.cheats");
+    private static boolean xrayWas;
+    private static boolean freecamOn;
+    private static double camX, camY, camZ, prevCamX, prevCamY, prevCamZ;
+    private static float camYaw, camPitch;
+
+    public static boolean cheatsAllowed() {
+        return CHEATS;
+    }
+
     @Override
     public void onInitializeClient() {
         VConfig.load();
+        if (CHEATS) {
+            VConfig.setEnabled(Module.FREECAM, false);
+            LOGGER.info("Hacker mode unlocked: X-Ray, Reach-Hits, Speed Hack and Freecam are available.");
+        }
         LOGGER.info("V-Client mod loaded. Press {} in game to open the mod menu.",
                 KeyNames.name(VConfig.integer(Module.CLIENT, "menuKey")));
     }
@@ -46,7 +61,7 @@ public final class VClientMod implements ClientModInitializer {
         menuKeyWasDown = menuKeyDown;
 
         for (Module module : Module.values()) {
-            if (!module.toggleable()) continue;
+            if (!module.toggleable() || (module.cheat() && !CHEATS)) continue;
             boolean down = inGame && keyDown(client, VConfig.integer(module, CommonSettings.TOGGLE_KEY.id()));
             if (down && !TOGGLE_KEYS_DOWN.getOrDefault(module, false)) {
                 boolean enabled = !VConfig.enabled(module);
@@ -74,6 +89,8 @@ public final class VClientMod implements ClientModInitializer {
             zooming = zoomKeyDown;
         }
 
+        if (CHEATS) tickCheats(client);
+
         if (client.player != null) {
             double x = client.player.getX();
             double z = client.player.getZ();
@@ -87,6 +104,99 @@ public final class VClientMod implements ClientModInitializer {
             lastX = Double.NaN;
             speed = 0;
         }
+    }
+
+    private static void tickCheats(MinecraftClient client) {
+        boolean xray = VConfig.enabled(Module.XRAY);
+        if (xray != xrayWas) {
+            xrayWas = xray;
+            if (client.worldRenderer != null && client.world != null) client.worldRenderer.reload();
+        }
+
+        boolean freecam = VConfig.enabled(Module.FREECAM) && client.player != null;
+        if (freecam && !freecamOn) {
+            camX = prevCamX = client.player.getX();
+            camY = prevCamY = client.player.getEyeY();
+            camZ = prevCamZ = client.player.getZ();
+            camYaw = client.player.getYaw();
+            camPitch = client.player.getPitch();
+        }
+        if (!freecam && VConfig.enabled(Module.FREECAM)) VConfig.setEnabled(Module.FREECAM, false);
+        freecamOn = freecam;
+
+        if (client.player == null) return;
+        if (freecamOn) {
+            tickFreecam(client);
+        } else if (VConfig.enabled(Module.SPEED_HACK) && !client.player.hasVehicle()
+                && !client.player.isSneaking()) {
+            tickSpeedHack(client);
+        }
+    }
+
+    private static void tickFreecam(MinecraftClient client) {
+        prevCamX = camX;
+        prevCamY = camY;
+        prevCamZ = camZ;
+        if (client.currentScreen != null) return;
+        double yaw = Math.toRadians(camYaw);
+        double pitch = Math.toRadians(camPitch);
+        double forward = axis(client.options.forwardKey.isPressed(), client.options.backKey.isPressed());
+        double strafe = axis(client.options.rightKey.isPressed(), client.options.leftKey.isPressed());
+        double vertical = axis(client.options.jumpKey.isPressed(), client.options.sneakKey.isPressed());
+        double dx = forward * -Math.sin(yaw) * Math.cos(pitch) + strafe * -Math.cos(yaw);
+        double dy = forward * -Math.sin(pitch) + vertical;
+        double dz = forward * Math.cos(yaw) * Math.cos(pitch) + strafe * -Math.sin(yaw);
+        double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (length < 1.0E-4) return;
+        double step = 0.3 * VConfig.get(Module.FREECAM, "speed") / length;
+        camX += dx * step;
+        camY += dy * step;
+        camZ += dz * step;
+    }
+
+    private static void tickSpeedHack(MinecraftClient client) {
+        if (client.currentScreen != null) return;
+        double forward = axis(client.options.forwardKey.isPressed(), client.options.backKey.isPressed());
+        double strafe = axis(client.options.rightKey.isPressed(), client.options.leftKey.isPressed());
+        if (forward == 0 && strafe == 0) return;
+        double yaw = Math.toRadians(client.player.getYaw());
+        double dx = forward * -Math.sin(yaw) + strafe * -Math.cos(yaw);
+        double dz = forward * Math.cos(yaw) + strafe * -Math.sin(yaw);
+        double length = Math.sqrt(dx * dx + dz * dz);
+        // 0.2806 blocks per tick is vanilla sprinting speed on flat ground.
+        double blocksPerTick = 0.2806 * VConfig.get(Module.SPEED_HACK, "multiplier");
+        var velocity = client.player.getVelocity();
+        client.player.setVelocity(dx / length * blocksPerTick, velocity.y, dz / length * blocksPerTick);
+    }
+
+    private static double axis(boolean positive, boolean negative) {
+        return (positive ? 1 : 0) - (negative ? 1 : 0);
+    }
+
+    public static boolean freecamActive() {
+        return freecamOn;
+    }
+
+    public static net.minecraft.util.math.Vec3d freecamPosition(float tickProgress) {
+        return new net.minecraft.util.math.Vec3d(prevCamX + (camX - prevCamX) * tickProgress,
+                prevCamY + (camY - prevCamY) * tickProgress, prevCamZ + (camZ - prevCamZ) * tickProgress);
+    }
+
+    public static float freecamYaw() {
+        return camYaw;
+    }
+
+    public static float freecamPitch() {
+        return camPitch;
+    }
+
+    public static void freecamLook(double cursorDeltaX, double cursorDeltaY) {
+        camYaw += (float) cursorDeltaX * 0.15f;
+        camPitch = Math.clamp(camPitch + (float) cursorDeltaY * 0.15f, -90f, 90f);
+    }
+
+    public static double reachDistance() {
+        return VConfig.enabled(Module.REACH) ? VConfig.get(Module.REACH, "distance") : 0;
     }
 
     private static boolean keyDown(MinecraftClient client, int key) {
@@ -115,7 +225,7 @@ public final class VClientMod implements ClientModInitializer {
     }
 
     public static boolean fullbright() {
-        return VConfig.enabled(Module.FULLBRIGHT);
+        return VConfig.enabled(Module.FULLBRIGHT) || VConfig.enabled(Module.XRAY);
     }
 
     public static double fullbrightGamma() {

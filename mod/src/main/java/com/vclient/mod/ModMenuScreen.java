@@ -43,7 +43,7 @@ public final class ModMenuScreen extends Screen {
 
     @Override
     protected void init() {
-        Module[] modules = Module.values();
+        Module[] modules = Module.available();
         columns = Math.max(1, Math.min(3, (width - 40) / (CARD_WIDTH + CARD_GAP)));
         int rows = (modules.length + columns - 1) / columns;
         gridContentHeight = rows * CARD_HEIGHT + (rows - 1) * CARD_GAP;
@@ -101,7 +101,7 @@ public final class ModMenuScreen extends Screen {
 
         boolean overGrid = grid.contains(mouseX, mouseY);
         context.enableScissor(grid.x(), grid.y(), grid.x() + grid.width(), grid.y() + grid.height());
-        Module[] modules = Module.values();
+        Module[] modules = Module.available();
         for (int index = 0; index < modules.length; index++) {
             Area area = card(index);
             if (area.y() + area.height() < grid.y() || area.y() > grid.y() + grid.height()) continue;
@@ -171,7 +171,7 @@ public final class ModMenuScreen extends Screen {
         double x = click.comp_4798();
         double y = click.comp_4799();
         if (grid.contains(x, y)) {
-            Module[] modules = Module.values();
+            Module[] modules = Module.available();
             for (int index = 0; index < modules.length; index++) {
                 Area area = card(index);
                 if (!area.contains(x, y)) continue;

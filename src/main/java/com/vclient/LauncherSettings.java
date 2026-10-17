@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 final class LauncherSettings {
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -23,6 +25,10 @@ final class LauncherSettings {
     private String backendToken = "";
     private String installId = "";
     private boolean autoUpdate = true;
+    /** Ely.by account names allowed to use hacker mode. Izyrn is the first admin. */
+    private final Set<String> adminUsers = new LinkedHashSet<>(Set.of("Izyrn"));
+    /** Ids of accounts whose owner picked "Hacker / Cheater" instead of "Normal player". */
+    private final Set<String> hackerAccountIds = new LinkedHashSet<>();
 
     private LauncherSettings(Path minecraftDirectory, int memoryGb, int javaMajorOverride,
                              String lastAccountId, String discordInvite, boolean offlineMode) {
@@ -58,6 +64,8 @@ final class LauncherSettings {
         settings.backendToken = saved.path("backendToken").asText("");
         settings.autoUpdate = saved.path("autoUpdate").asBoolean(true);
         settings.installId = saved.path("installId").asText("");
+        saved.path("adminUsers").forEach(name -> settings.adminUsers.add(name.asText("")));
+        saved.path("hackerAccountIds").forEach(id -> settings.hackerAccountIds.add(id.asText("")));
         boolean newInstallId = settings.installId.isBlank();
         if (newInstallId) settings.installId = java.util.UUID.randomUUID().toString();
         if (!minecraftDirectory.equals(selectedDirectory) || newInstallId) settings.save();
@@ -104,6 +112,10 @@ final class LauncherSettings {
         saved.put("backendToken", backendToken);
         saved.put("autoUpdate", autoUpdate);
         saved.put("installId", installId);
+        var admins = saved.putArray("adminUsers");
+        adminUsers.forEach(admins::add);
+        var hackers = saved.putArray("hackerAccountIds");
+        hackerAccountIds.forEach(hackers::add);
         JSON.writerWithDefaultPrettyPrinter().writeValue(SETTINGS_FILE.toFile(), saved);
     }
 
@@ -186,6 +198,26 @@ final class LauncherSettings {
 
     void setAutoUpdate(boolean autoUpdate) {
         this.autoUpdate = autoUpdate;
+    }
+
+    boolean isAdmin(PlayerAccount account) {
+        return account != null && account.type() == PlayerAccount.Type.ELY_BY
+                && adminUsers.stream().anyMatch(name -> name.equalsIgnoreCase(account.name()));
+    }
+
+    boolean hackerSelected(PlayerAccount account) {
+        return account != null && hackerAccountIds.contains(account.id());
+    }
+
+    void setHackerSelected(PlayerAccount account, boolean hacker) {
+        if (account == null) return;
+        if (hacker) hackerAccountIds.add(account.id());
+        else hackerAccountIds.remove(account.id());
+    }
+
+    /** Cheat modules are enabled only for an admin account that chose Hacker / Cheater. */
+    boolean cheatsEnabled(PlayerAccount account) {
+        return isAdmin(account) && hackerSelected(account);
     }
 
     static int maxMemory() {

@@ -4,11 +4,16 @@
   "package": "com.vclient.mod.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "BlockMixin",
+    "CameraMixin",
+    "EntityMixin",
     "GameRendererMixin",
     "InGameHudMixin",
+    "KeyboardInputMixin",
     "LightmapTextureManagerMixin",
     "MinecraftClientMixin",
     "MouseMixin",
+    "PlayerEntityMixin",
     "ScreenMixin"
   ],
   "injectors": {

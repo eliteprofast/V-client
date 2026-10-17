@@ -138,6 +138,7 @@ public final class LauncherApp extends Application {
                     ? 25 : requiredMajor;
             return javaRuntimeManager.resolve(selectedMajor, onOutput, allowDownloads);
         });
+        gameLauncher.setCheatPermission(settings::cheatsEnabled);
         accounts.addAll(accountStore.load());
         localFriends.addAll(friendsStore.load());
         account = accounts.stream().filter(saved -> saved.id().equals(settings.lastAccountId()))
@@ -359,6 +360,7 @@ public final class LauncherApp extends Application {
         });
 
         VBox accountCard = buildAccountCard();
+        VBox playerModeCard = buildPlayerModeCard();
 
         HBox footer = new HBox(12);
         footer.setAlignment(Pos.CENTER_LEFT);
@@ -367,9 +369,39 @@ public final class LauncherApp extends Application {
         backButton.setOnAction(event -> showHome());
         status = label("Settings save automatically.", 12, MUTED);
         footer.getChildren().addAll(backButton, status);
-        content.getChildren().addAll(title, subtitle, directoryCard, memoryCard, javaCard, accountCard, footer);
+        content.getChildren().addAll(title, subtitle, directoryCard, memoryCard, javaCard, accountCard, playerModeCard, footer);
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+    }
+
+    /** Normal player / Hacker-Cheater choice for the selected account; cheats also need an admin account. */
+    private VBox buildPlayerModeCard() {
+        VBox card = card();
+        Label title = label("PLAYER MODE", 11, MUTED);
+        ComboBox<String> choice = new ComboBox<>();
+        String normal = "Normal player";
+        String hacker = "Hacker / Cheater";
+        choice.getItems().setAll(normal, hacker);
+        choice.setValue(settings.hackerSelected(account) ? hacker : normal);
+        choice.setMaxWidth(Double.MAX_VALUE);
+        choice.setStyle("-fx-background-color: rgba(20, 20, 45, 0.92); -fx-text-fill: #f3f0ff; -fx-font-size: 14px; -fx-border-color: #48415f; -fx-border-radius: 8; -fx-background-radius: 8;");
+        Label hint = label("", 11, MUTED);
+        hint.setWrapText(true);
+        Runnable refreshHint = () -> hint.setText(account == null
+                ? "Select an account first."
+                : !settings.hackerSelected(account)
+                ? "Normal permissions: the Right Shift menu has the regular V-Client mods."
+                : settings.isAdmin(account)
+                ? "Hacker mode is active for " + account.name() + ": the Right Shift menu also has Fullbright, X-Ray, Reach-Hits, Speed hack and Freecam."
+                : "Only admin Ely.by accounts can use Hacker / Cheater. " + account.name() + " will play with normal permissions.");
+        refreshHint.run();
+        choice.valueProperty().addListener((observable, oldChoice, newChoice) -> {
+            settings.setHackerSelected(account, hacker.equals(newChoice));
+            saveSettings();
+            refreshHint.run();
+        });
+        card.getChildren().addAll(title, choice, hint);
+        return card;
     }
 
     private void importLocalMinecraftFiles(Button importButton) {

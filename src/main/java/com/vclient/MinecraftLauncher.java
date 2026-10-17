@@ -45,10 +45,16 @@ final class MinecraftLauncher {
             "[A-Za-z0-9](?:[A-Za-z0-9._+ -]{0,126}[A-Za-z0-9_+-])?");
     private static final int MAX_DOWNLOADS = 8;
     private final JavaRuntimeResolver javaRuntimeResolver;
+    private volatile java.util.function.Predicate<PlayerAccount> cheatPermission = account -> false;
 
     @FunctionalInterface
     interface JavaRuntimeResolver {
         Path resolve(int javaMajor, Consumer<String> onOutput, boolean allowDownloads) throws Exception;
+    }
+
+    /** Decides per account whether the in-game cheat modules are unlocked ({@code -Dvclient.cheats=true}). */
+    void setCheatPermission(java.util.function.Predicate<PlayerAccount> cheatPermission) {
+        this.cheatPermission = cheatPermission;
     }
 
     MinecraftLauncher() {
@@ -536,6 +542,7 @@ final class MinecraftLauncher {
                     : ensureAuthlibInjector(minecraftDirectory, onOutput);
             if (authlibInjector != null) command.add(authlibInjectorArgument(authlibInjector));
         }
+        if (cheatPermission.test(account)) command.add("-Dvclient.cheats=true");
         command.addAll(arguments(version.path("arguments").path("jvm"), substitutions));
         if (!version.path("arguments").path("jvm").isArray()) {
             command.add("-Djava.library.path=" + nativesDirectory);

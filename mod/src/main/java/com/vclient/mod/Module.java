@@ -44,9 +44,17 @@ public enum Module {
             Setting.number("brightness", "Brightness", 15, 2, 15, 1, "x")),
     NO_HURT_CAM("No Hurt Cam", "No shake when hit", false, Kind.FEATURE),
     TOGGLE_SPRINT("Toggle Sprint", "Tap to keep sprinting", false, Kind.HUD),
-    TOGGLE_SNEAK("Toggle Sneak", "Tap to keep sneaking", false, Kind.FEATURE);
+    TOGGLE_SNEAK("Toggle Sneak", "Tap to keep sneaking", false, Kind.FEATURE),
+    // Hacker mode only: shown and usable when the launcher started the game with -Dvclient.cheats=true.
+    XRAY("X-Ray", "See ores through walls", false, Kind.CHEAT),
+    REACH("Reach-Hits", "Hit from further away", false, Kind.CHEAT,
+            Setting.number("distance", "Reach", 6, 3, 8, 0.5, " blocks")),
+    SPEED_HACK("Speed Hack", "Move faster", false, Kind.CHEAT,
+            Setting.number("multiplier", "Speed", 2, 1, 10, 0.5, "x")),
+    FREECAM("Freecam", "Fly the camera around", false, Kind.CHEAT,
+            Setting.number("speed", "Camera speed", 3, 1, 10, 1, "x"));
 
-    private enum Kind { ALWAYS_ON, FEATURE, HUD }
+    private enum Kind { ALWAYS_ON, FEATURE, HUD, CHEAT }
 
 
     private final String title;
@@ -68,6 +76,17 @@ public enum Module {
         }
         if (kind != Kind.ALWAYS_ON) all.add(CommonSettings.TOGGLE_KEY);
         this.settings = List.copyOf(all);
+    }
+
+    /** Whether the module is a hacker-mode cheat, available only to admin accounts. */
+    public boolean cheat() {
+        return kind == Kind.CHEAT;
+    }
+
+    /** The modules shown in the menu: everything except cheats the player is not allowed to use. */
+    public static Module[] available() {
+        return java.util.Arrays.stream(values()).filter(module -> !module.cheat() || VClientMod.cheatsAllowed())
+                .toArray(Module[]::new);
     }
 
     public String title() {
