@@ -37,6 +37,8 @@ public final class CosmeticCatalog {
     private static final Gson GSON = new Gson();
     private static final String BUILTIN_RESOURCE = "/vclient/builtin-cosmetics.json";
     private static final int SCHEMA = 1;
+    /** Set by the launcher for admin accounts: every cosmetic is usable. Visual only, so this is not a security boundary. */
+    private static final boolean UNLOCK_ALL = Boolean.getBoolean("vclient.cosmetics.unlockAll");
 
     private static volatile List<Cosmetic> items = List.of();
     private static volatile Map<String, Cosmetic> byId = Map.of();
@@ -214,6 +216,7 @@ public final class CosmeticCatalog {
 
     /** Whether the player may equip the cosmetic right now. Purely a menu rule: nothing here affects gameplay. */
     public static boolean unlocked(Cosmetic cosmetic) {
+        if (UNLOCK_ALL) return true;
         long now = System.currentTimeMillis() / 1000;
         return switch (cosmetic.tier()) {
             case FREE -> cosmetic.windowOpen(now);

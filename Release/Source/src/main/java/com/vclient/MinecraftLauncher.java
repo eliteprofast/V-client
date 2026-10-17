@@ -47,6 +47,7 @@ final class MinecraftLauncher {
     private final JavaRuntimeResolver javaRuntimeResolver;
     private volatile java.util.function.Predicate<PlayerAccount> cheatPermission = account -> false;
     private volatile java.util.function.Supplier<String> backendUrl = () -> "";
+    private volatile java.util.function.Predicate<PlayerAccount> adminPermission = account -> false;
     private final ElyByAuthService elyByAuthService = new ElyByAuthService();
 
     @FunctionalInterface
@@ -57,6 +58,11 @@ final class MinecraftLauncher {
     /** Decides per account whether the in-game cheat modules are unlocked ({@code -Dvclient.cheats=true}). */
     void setCheatPermission(java.util.function.Predicate<PlayerAccount> cheatPermission) {
         this.cheatPermission = cheatPermission;
+    }
+
+    /** Admin accounts get every cosmetic unlocked in the game ({@code -Dvclient.cosmetics.unlockAll=true}). */
+    void setAdminPermission(java.util.function.Predicate<PlayerAccount> adminPermission) {
+        this.adminPermission = adminPermission;
     }
 
     /** Backend address handed to the in-game mod ({@code -Dvclient.backend}) for the cosmetics catalog. */
@@ -550,6 +556,7 @@ final class MinecraftLauncher {
             if (authlibInjector != null) command.add(authlibInjectorArgument(authlibInjector));
         }
         if (cheatPermission.test(account)) command.add("-Dvclient.cheats=true");
+        if (adminPermission.test(account)) command.add("-Dvclient.cosmetics.unlockAll=true");
         command.addAll(skinArguments(account, offlineOnly, onOutput));
         String backend = backendUrl.get();
         if (backend != null && !backend.isBlank()) command.add("-Dvclient.backend=" + backend.strip());

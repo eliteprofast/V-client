@@ -139,6 +139,7 @@ public final class LauncherApp extends Application {
             return javaRuntimeManager.resolve(selectedMajor, onOutput, allowDownloads);
         });
         gameLauncher.setCheatPermission(settings::cheatsEnabled);
+        gameLauncher.setAdminPermission(settings::isAdmin);
         gameLauncher.setBackendUrl(() -> BackendClient.resolveUrl(settings.backendUrl()));
         accounts.addAll(accountStore.load());
         localFriends.addAll(friendsStore.load());
@@ -616,6 +617,7 @@ public final class LauncherApp extends Application {
                 "Capes, wings, hats, emotes, animated pieces and trails. What you equip here is what you wear in game. "
                         + "Open the in-game menu with K for a live 3D preview. Cosmetics are visual only.");
         Path configFile = CosmeticsStore.configFile(settings.minecraftDirectory());
+        boolean adminUnlock = account != null && settings.isAdmin(account);
         BackendClient client = backend();
         Label status = label("Loading cosmetics...", 12, MUTED);
         VBox list = new VBox(8);
@@ -655,7 +657,7 @@ public final class LauncherApp extends Application {
                 if (!item.category().equals(selectedCategory[0])
                         || (!selectedTier[0].isEmpty() && !item.tier().equals(selectedTier[0]))) continue;
                 shown++;
-                boolean unlocked = CosmeticsStore.unlocked(item, owned, now);
+                boolean unlocked = adminUnlock || CosmeticsStore.unlocked(item, owned, now);
                 boolean isEquipped = item.id().equals(equipped.get(item.slot()));
                 Label name = label(item.name(), 14, unlocked ? "#f3f6fc" : "#8e8eb2");
                 String tierColor = switch (item.tier()) {
@@ -746,7 +748,8 @@ public final class LauncherApp extends Application {
         VBox controls = card();
         controls.getChildren().addAll(tabs, tiers, new HBox(10, refresh, clear), status);
         content.getChildren().addAll(controls, list,
-                label("The cosmetics file is shared with the game: " + configFile, 10, MUTED));
+                label((adminUnlock ? "Admin account: every cosmetic is unlocked for you. " : "")
+                        + "The cosmetics file is shared with the game: " + configFile, 10, MUTED));
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
         render[0].run();
