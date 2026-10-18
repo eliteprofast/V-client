@@ -2,6 +2,7 @@ module com.vclient {
     requires java.desktop;
     requires java.logging;
     requires java.net.http;
+    requires jdk.management;
     requires com.sun.jna;
     requires com.sun.jna.platform;
     requires javafx.controls;

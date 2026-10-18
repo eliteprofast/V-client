@@ -48,6 +48,7 @@ final class MinecraftLauncher {
     private volatile java.util.function.Predicate<PlayerAccount> cheatPermission = account -> false;
     private volatile java.util.function.Supplier<String> backendUrl = () -> "";
     private volatile java.util.function.Predicate<PlayerAccount> adminPermission = account -> false;
+    private volatile java.util.function.Supplier<BoostProfile.Tuning> boostTuning = () -> null;
     private final ElyByAuthService elyByAuthService = new ElyByAuthService();
 
     @FunctionalInterface
@@ -58,6 +59,11 @@ final class MinecraftLauncher {
     /** Decides per account whether the in-game cheat modules are unlocked ({@code -Dvclient.cheats=true}). */
     void setCheatPermission(java.util.function.Predicate<PlayerAccount> cheatPermission) {
         this.cheatPermission = cheatPermission;
+    }
+
+    /** VSMP Boost Mode: returns the tuning to apply at launch, or null while Boost Mode is off. */
+    void setBoostTuning(java.util.function.Supplier<BoostProfile.Tuning> boostTuning) {
+        this.boostTuning = boostTuning;
     }
 
     /** Admin accounts get every cosmetic unlocked in the game ({@code -Dvclient.cosmetics.unlockAll=true}). */
@@ -547,8 +553,24 @@ final class MinecraftLauncher {
         List<String> command = new ArrayList<>();
         onOutput.accept("Java runtime requested: " + javaMajor + "; executable: " + javaExecutable);
         command.add(javaExecutable.toString());
-        command.add("-Xmx" + memoryGb + "G");
-        command.add("-Xms512M");
+        BoostProfile.Tuning tuning = boostTuning.get();
+        if (tuning != null) {
+            onOutput.accept("VSMP Boost Mode: " + tuning.profile().label() + " - " + tuning.memoryGb()
+                    + " GB memory (-Xms" + tuning.initialHeap() + "), " + tuning.jvmFlags().size() + " JVM flags, "
+                    + tuning.options().size() + " video settings.");
+            try {
+                int changed = BoostOptions.apply(minecraftDirectory, tuning.options(), onOutput);
+                onOutput.accept("VSMP Boost Mode: " + changed + " video settings changed in options.txt.");
+            } catch (IOException e) {
+                onOutput.accept("VSMP Boost Mode: could not write options.txt, launching with your own settings: " + e.getMessage());
+            }
+            command.add("-Xmx" + tuning.memoryGb() + "G");
+            command.add("-Xms" + tuning.initialHeap());
+            command.addAll(tuning.jvmFlags());
+        } else {
+            command.add("-Xmx" + memoryGb + "G");
+            command.add("-Xms512M");
+        }
         if (account.type() == PlayerAccount.Type.ELY_BY) {
             Path authlibInjector = offlineOnly
                     ? findCachedAuthlibInjector(minecraftDirectory, onOutput)

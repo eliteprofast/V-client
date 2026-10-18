@@ -124,6 +124,15 @@ final class ModrinthModService {
         return resolveGameVersion(parentFile, versionsDirectory, visited);
     }
 
+    /** Finds the newest compatible release of a project by its Modrinth slug, or null when there is none. */
+    ModProject findBySlug(String slug, String title, Target target, Consumer<String> onProgress)
+            throws IOException, InterruptedException {
+        if (!PROJECT_ID.matcher(slug).matches()) throw new IOException("Invalid Modrinth project: " + slug);
+        com.fasterxml.jackson.databind.node.ObjectNode hit = JSON.createObjectNode();
+        hit.put("title", title);
+        return findCompatibleVersion(hit, slug, target, onProgress);
+    }
+
     private ModProject findCompatibleVersion(JsonNode hit, String projectId, Target target,
                                              Consumer<String> onProgress)
             throws IOException, InterruptedException {

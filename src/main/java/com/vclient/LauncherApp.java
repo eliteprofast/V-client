@@ -141,6 +141,8 @@ public final class LauncherApp extends Application {
         });
         gameLauncher.setCheatPermission(settings::cheatsEnabled);
         gameLauncher.setAdminPermission(settings::isAdmin);
+        gameLauncher.setBoostTuning(() -> settings.boostEnabled()
+                ? settings.boostProfile().tuning(BoostProfile.physicalRamBytes()) : null);
         BackendClient.setRequestLog(line -> Platform.runLater(() -> appendLog(line)), settings.debugMode());
         gameLauncher.setBackendUrl(() -> BackendClient.resolveUrl(settings.backendUrl()));
         accounts.addAll(accountStore.load());
@@ -547,42 +549,359 @@ public final class LauncherApp extends Application {
         settingsPage = false;
         updateNavigationState();
         StackPane root = baseLayout();
-        VBox content = pageContent("Performance", "Boost", "Set a safe Minecraft memory limit. V-Client does not alter Windows, game files, or background processes.");
-        VBox memoryCard = card();
-        HBox heading = new HBox();
-        heading.setAlignment(Pos.CENTER_LEFT);
-        Label title = label("MAXIMUM GAME MEMORY", 11, MUTED);
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        Label value = label(settings.memoryGb() + " GB", 18, "#f3f6fc");
-        heading.getChildren().addAll(title, spacer, value);
-        Slider memory = new Slider(1, LauncherSettings.maxMemory(), settings.memoryGb());
-        memory.setMajorTickUnit(1);
-        memory.setMinorTickCount(0);
-        memory.setSnapToTicks(true);
-        memory.setShowTickMarks(true);
-        memory.setStyle("-fx-control-inner-background: " + ACCENT + "; -fx-accent: " + ACCENT + ";");
-        Label hint = label("Leave memory for Windows and other apps. Changes are saved on this device.", 12, MUTED);
-        memory.valueProperty().addListener((observable, oldValue, newValue) -> {
-            int gigabytes = newValue.intValue();
-            settings.setMemoryGb(gigabytes);
-            value.setText(gigabytes + " GB");
-            saveSettings();
-        });
-        HBox presets = new HBox(8);
-        for (int preset : List.of(2, 4, 6, 8)) {
-            if (preset > LauncherSettings.maxMemory()) continue;
-            Button choice = button(preset + " GB", "#292642", 10);
-            choice.setOnAction(event -> memory.setValue(preset));
-            presets.getChildren().add(choice);
-        }
-        memoryCard.getChildren().addAll(heading, memory, presets, hint);
-        VBox note = card();
-        note.getChildren().addAll(label("Safe performance settings", 15, "#f3f6fc"),
-                label("V-Client applies your memory limit to new launches only. It does not kill tasks, change system settings, or promise FPS gains.", 12, MUTED));
-        content.getChildren().addAll(memoryCard, note);
+        VBox content = pageContent("Performance", "VSMP Boost",
+                "One switch for more FPS and fewer lag spikes: tuned video settings, optimisation mods, the right amount of memory and smoother garbage collection.");
+        BoostPage page = new BoostPage(content);
+        content.getChildren().addAll(page.masterCard(), page.status, page.profilesCard(), page.detailsCard(), page.manualMemoryCard());
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+        page.refresh();
+    }
+
+    /** The Boost page: master switch, four profile cards, what the selected profile changes, manual memory. */
+    private final class BoostPage {
+        private final VBox content;
+        private final VBox status = new VBox(10);
+        private final HBox estimateRow = new HBox(12);
+        private final VBox detailsBody = new VBox(16);
+        private final javafx.scene.layout.FlowPane profileFlow = new javafx.scene.layout.FlowPane(12, 12);
+        private final List<VBox> profileCards = new ArrayList<>();
+        private final Label masterState = ModsUi.text("", 13, ModsUi.MUTED, false);
+        private final Label hardware = ModsUi.text("", 11, "#7f7fa6", false);
+        private javafx.scene.layout.StackPane masterSwitch;
+        private boolean working;
+
+        BoostPage(VBox content) {
+            this.content = content;
+            status.setManaged(false);
+            status.setVisible(false);
+            profileFlow.setMaxWidth(Double.MAX_VALUE);
+            profileFlow.widthProperty().addListener((observable, oldWidth, newWidth) -> layoutProfiles());
+        }
+
+        VBox masterCard() {
+            VBox card = ModsUi.glassCard(14, new Insets(20));
+            Label title = ModsUi.text("VSMP BOOST MODE", 16, ModsUi.TEXT, true);
+            masterSwitch = ModsUi.switchPill(settings.boostEnabled(), this::onToggle);
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            HBox top = new HBox(14, title, spacer, masterState, masterSwitch);
+            top.setAlignment(Pos.CENTER_LEFT);
+            estimateRow.setAlignment(Pos.CENTER_LEFT);
+            hardware.setWrapText(true);
+            card.getChildren().addAll(top, estimateRow, hardware);
+            return card;
+        }
+
+        VBox profilesCard() {
+            VBox card = ModsUi.glassCard(14, new Insets(20));
+            card.getChildren().addAll(ModsUi.sectionTitle("Choose a profile"), profileFlow);
+            for (BoostProfile profile : BoostProfile.values()) {
+                VBox profileCard = profileCard(profile);
+                profileCards.add(profileCard);
+                profileFlow.getChildren().add(profileCard);
+            }
+            return card;
+        }
+
+        VBox detailsCard() {
+            VBox card = ModsUi.glassCard(14, new Insets(20));
+            Button apply = new Button("APPLY AND INSTALL MODS");
+            apply.setMinHeight(42);
+            apply.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: #171326; -fx-font-size: 12px; -fx-font-weight: bold;"
+                    + " -fx-background-radius: 12; -fx-padding: 0 22 0 22; -fx-cursor: hand;");
+            apply.setOnAction(event -> apply());
+            Button restore = new Button("RESTORE MY SETTINGS");
+            restore.setMinHeight(42);
+            restore.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-text-fill: #f5f7fd; -fx-font-size: 12px;"
+                    + " -fx-font-weight: bold; -fx-background-radius: 12; -fx-padding: 0 22 0 22; -fx-cursor: hand;");
+            restore.setOnAction(event -> disable());
+            HBox buttons = new HBox(10, apply, restore);
+            buttons.setAlignment(Pos.CENTER_LEFT);
+            card.getChildren().addAll(ModsUi.sectionTitle("What this profile changes"), detailsBody, buttons,
+                    ModsUi.text("Your own video settings are saved first and come back with RESTORE MY SETTINGS or when you switch Boost Mode off. "
+                            + "While Boost Mode is on, the profile's video settings are applied at every launch.", 11, ModsUi.MUTED, false));
+            ((Label) card.getChildren().get(card.getChildren().size() - 1)).setWrapText(true);
+            return card;
+        }
+
+        VBox manualMemoryCard() {
+            VBox card = ModsUi.glassCard(14, new Insets(20));
+            HBox heading = new HBox();
+            heading.setAlignment(Pos.CENTER_LEFT);
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            Label value = ModsUi.text(settings.memoryGb() + " GB", 18, ModsUi.TEXT, true);
+            heading.getChildren().addAll(ModsUi.sectionTitle("Manual game memory (used when Boost Mode is off)"), spacer, value);
+            Slider memory = new Slider(1, LauncherSettings.maxMemory(), settings.memoryGb());
+            memory.setMajorTickUnit(1);
+            memory.setMinorTickCount(0);
+            memory.setSnapToTicks(true);
+            memory.setShowTickMarks(true);
+            memory.setStyle("-fx-control-inner-background: " + ACCENT + "; -fx-accent: " + ACCENT + ";");
+            memory.valueProperty().addListener((observable, oldValue, newValue) -> {
+                settings.setMemoryGb(newValue.intValue());
+                value.setText(newValue.intValue() + " GB");
+                saveSettings();
+            });
+            card.getChildren().addAll(heading, memory);
+            return card;
+        }
+
+        private VBox profileCard(BoostProfile profile) {
+            Label name = ModsUi.text(profile.label(), 15, ModsUi.TEXT, true);
+            Label tagline = ModsUi.text(profile.tagline(), 11, ModsUi.MUTED, false);
+            tagline.setWrapText(true);
+            tagline.setMinHeight(32);
+            Label gain = ModsUi.chip("≈ " + profile.estimatedFpsGain() + " FPS", ModsUi.GOOD);
+            var options = profile.options();
+            Label facts = ModsUi.text("Render distance " + options.get("renderDistance") + "  ·  Simulation "
+                    + options.get("simulationDistance") + "\n" + profile.mods().size() + " optimisation mods", 11, "#8f8fb4", false);
+            facts.setWrapText(true);
+            VBox card = new VBox(8, name, tagline, gain, facts);
+            card.setPadding(new Insets(16));
+            card.setUserData(profile);
+            card.setCursor(javafx.scene.Cursor.HAND);
+            card.setOnMouseClicked(event -> select(profile));
+            return card;
+        }
+
+        private void styleProfileCards() {
+            for (VBox card : profileCards) {
+                boolean selected = card.getUserData() == settings.boostProfile();
+                String base = "-fx-background-radius: 14; -fx-border-radius: 14; -fx-border-width: " + (selected ? "2" : "1") + ";"
+                        + " -fx-background-color: " + (selected ? "rgba(230,189,89,0.13)" : "rgba(255,255,255,0.05)") + ";"
+                        + " -fx-border-color: " + (selected ? "rgba(230,189,89,0.85)" : "rgba(255,255,255,0.10)") + ";";
+                card.setStyle(base);
+                ModsUi.hoverLift(card, base);
+            }
+        }
+
+        private void layoutProfiles() {
+            double available = profileFlow.getWidth();
+            if (available <= 0) return;
+            int columns = available >= 900 ? 4 : available >= 520 ? 2 : 1;
+            double width = Math.floor((available - 12 * (columns - 1)) / columns) - 1;
+            profileFlow.setPrefWrapLength(available);
+            for (VBox card : profileCards) {
+                card.setPrefWidth(width);
+                card.setMinWidth(Math.min(width, 180));
+                card.setMaxWidth(width);
+            }
+        }
+
+        // ---- state -----------------------------------------------------------------------------------
+
+        void refresh() {
+            long ram = BoostProfile.physicalRamBytes();
+            BoostProfile profile = settings.boostProfile();
+            boolean enabled = settings.boostEnabled();
+            masterState.setText(enabled ? profile.label() + " is on" : "Off");
+            masterState.setStyle(masterState.getStyle() + " -fx-text-fill: " + (enabled ? ModsUi.GOOD : ModsUi.MUTED) + ";");
+            ModsUi.setSwitch(masterSwitch, enabled);
+            estimateRow.getChildren().setAll(
+                    ModsUi.text("Estimated FPS gain", 12, ModsUi.MUTED, false),
+                    ModsUi.chip("≈ " + profile.estimatedFpsGain(), ModsUi.GOOD),
+                    ModsUi.text("typical range, not a measurement - it depends on your PC, world and server", 11, "#7f7fa6", false));
+            hardware.setText("This PC has about " + (ram / (1024L * 1024 * 1024)) + " GB of RAM, so " + profile.label()
+                    + " gives the game " + profile.recommendedMemoryGb(ram) + " GB. Java is chosen automatically: V-Client uses the Azul Zulu version your Minecraft version needs and downloads it when missing.");
+            styleProfileCards();
+            layoutProfiles();
+            showDetails(profile, ram);
+        }
+
+        private void showDetails(BoostProfile profile, long ram) {
+            Path modsDirectory = settings.minecraftDirectory().resolve("mods");
+            VBox video = new VBox(4);
+            video.getChildren().add(ModsUi.text("Video settings", 12, ModsUi.TEXT, true));
+            profile.options().forEach((key, value) -> video.getChildren().add(
+                    ModsUi.text(prettyOption(key) + "  →  " + value.replace("\"", ""), 11, ModsUi.MUTED, false)));
+            VBox java = new VBox(4);
+            int memory = profile.recommendedMemoryGb(ram);
+            java.getChildren().addAll(ModsUi.text("Memory and JVM", 12, ModsUi.TEXT, true),
+                    ModsUi.text("Heap  -Xmx" + memory + "G  -Xms" + profile.initialHeap(memory), 11, ModsUi.MUTED, false),
+                    ModsUi.text(profile.jvmFlags().size() + " garbage-collector flags for short, even pauses", 11, ModsUi.MUTED, false),
+                    ModsUi.text(String.join("  ", profile.jvmFlags()), 10, "#6f6f96", false));
+            ((Label) java.getChildren().get(3)).setWrapText(true);
+            VBox mods = new VBox(4);
+            mods.getChildren().add(ModsUi.text("Optimisation mods (Fabric, from Modrinth)", 12, ModsUi.TEXT, true));
+            for (BoostProfile.BoostMod mod : profile.mods()) {
+                boolean present = modInstalled(modsDirectory, mod.slug());
+                mods.getChildren().add(ModsUi.text((present ? "✓ " : "○ ") + mod.name() + "  —  " + mod.effect(), 11,
+                        present ? ModsUi.GOOD : ModsUi.MUTED, false));
+            }
+            javafx.scene.layout.FlowPane columns = new javafx.scene.layout.FlowPane(28, 16, video, java, mods);
+            detailsBody.getChildren().setAll(columns);
+            columns.setPrefWrapLength(600);
+        }
+
+        private String prettyOption(String key) {
+            return switch (key) {
+                case "enableVsync" -> "VSync";
+                case "maxFps" -> "Max FPS";
+                case "graphicsPreset" -> "Graphics";
+                case "ao" -> "Smooth lighting";
+                case "entityShadows" -> "Entity shadows";
+                case "renderClouds" -> "Clouds";
+                case "particles" -> "Particles (0 all, 1 fewer, 2 minimal)";
+                case "mipmapLevels" -> "Mipmap levels";
+                case "renderDistance" -> "Render distance";
+                case "simulationDistance" -> "Simulation distance";
+                case "biomeBlendRadius" -> "Biome blend";
+                case "entityDistanceScaling" -> "Entity distance";
+                default -> key;
+            };
+        }
+
+        private boolean modInstalled(Path modsDirectory, String slug) {
+            String token = slug.replace("-", "");
+            try (var files = Files.isDirectory(modsDirectory) ? Files.list(modsDirectory) : java.util.stream.Stream.<Path>empty()) {
+                return files.anyMatch(file -> {
+                    String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT).replace("-", "").replace("_", "");
+                    return name.contains(token) && name.endsWith(".jar");
+                });
+            } catch (IOException e) {
+                return false;
+            }
+        }
+
+        private void select(BoostProfile profile) {
+            if (working) return;
+            settings.setBoostProfile(profile);
+            saveSettings();
+            refresh();
+            if (settings.boostEnabled()) apply();
+        }
+
+        private void onToggle(boolean on) {
+            if (working) {
+                refresh();
+                return;
+            }
+            if (on) apply();
+            else disable();
+        }
+
+        private void showStatus(javafx.scene.Node... nodes) {
+            status.getChildren().setAll(nodes);
+            status.setManaged(true);
+            status.setVisible(true);
+        }
+
+        private HBox success(String message) {
+            Label icon = ModsUi.text("✓", 16, "#08140e", true);
+            icon.setMinSize(30, 30);
+            icon.setAlignment(Pos.CENTER);
+            icon.setStyle(icon.getStyle() + " -fx-background-color: " + ModsUi.GOOD + "; -fx-background-radius: 15;");
+            Label text = ModsUi.text(message, 13, "#bff5d6", true);
+            text.setWrapText(true);
+            HBox box = new HBox(12, icon, text);
+            box.setAlignment(Pos.CENTER_LEFT);
+            box.setPadding(new Insets(12, 16, 12, 14));
+            box.setStyle("-fx-background-color: rgba(57,217,138,0.10); -fx-background-radius: 14;"
+                    + " -fx-border-color: rgba(57,217,138,0.40); -fx-border-radius: 14;");
+            return box;
+        }
+
+        // ---- apply / restore ---------------------------------------------------------------------------
+
+        void apply() {
+            if (working) return;
+            working = true;
+            BoostProfile profile = settings.boostProfile();
+            settings.setBoostEnabled(true);
+            saveSettings();
+            refresh();
+            showStatus(ModsUi.busyLabel("Applying " + profile.label() + "..."));
+            Path minecraftDirectory = settings.minecraftDirectory();
+            boolean offline = settings.offlineMode();
+            executor.execute(() -> {
+                List<javafx.scene.Node> notes = new ArrayList<>();
+                int installed = 0;
+                int already = 0;
+                int unavailable = 0;
+                String modProblem = null;
+                int changed = 0;
+                try {
+                    changed = BoostOptions.apply(minecraftDirectory, profile.options(),
+                            line -> Platform.runLater(() -> appendLog(line)));
+                } catch (IOException e) {
+                    modProblem = null;
+                    String message = e.getMessage();
+                    notes.add(ModsUi.warningBox("Couldn't write the video settings", message, null));
+                    Platform.runLater(() -> appendLog("Boost: could not write options.txt: " + message));
+                }
+                Path modsDirectory = minecraftDirectory.resolve("mods");
+                try {
+                    if (offline) throw new IOException("Offline mode is on, so Modrinth is not contacted. Turn it off on the Home page to install the optimisation mods.");
+                    MinecraftLauncher.InstalledVersion fabric = gameLauncher.findVersions(minecraftDirectory).stream()
+                            .filter(version -> "Fabric".equals(version.loader()))
+                            .sorted(java.util.Comparator.comparing((MinecraftLauncher.InstalledVersion version) ->
+                                    !version.id().equals(selectedVersionId)))
+                            .findFirst().orElse(null);
+                    if (fabric == null) {
+                        throw new IOException("No Fabric profile is installed, so the optimisation mods were skipped. Install the V-Client Fabric profile on the Home page first.");
+                    }
+                    ModrinthModService.Target target = ModrinthModService.resolveTarget(minecraftDirectory, fabric);
+                    for (BoostProfile.BoostMod mod : profile.mods()) {
+                        if (modInstalled(modsDirectory, mod.slug())) {
+                            already++;
+                            continue;
+                        }
+                        ModrinthModService.ModProject project = modrinthModService.findBySlug(mod.slug(), mod.name(), target,
+                                line -> Platform.runLater(() -> appendLog(line)));
+                        if (project == null) {
+                            unavailable++;
+                            Platform.runLater(() -> appendLog("Boost: " + mod.name() + " has no release for "
+                                    + target.loader() + " " + target.gameVersion() + " yet; skipped."));
+                            continue;
+                        }
+                        modrinthModService.install(project, minecraftDirectory, line -> Platform.runLater(() -> appendLog(line)));
+                        installed++;
+                    }
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    modProblem = e.getMessage();
+                    Platform.runLater(() -> appendLog("Boost: optimisation mods could not be installed: " + e.getMessage()));
+                }
+                int changedSettings = changed;
+                int installedMods = installed;
+                int alreadyMods = already;
+                int unavailableMods = unavailable;
+                String problem = modProblem;
+                Platform.runLater(() -> {
+                    working = false;
+                    refresh();
+                    List<javafx.scene.Node> all = new ArrayList<>();
+                    all.add(success(profile.label() + " applied: " + changedSettings + " video settings changed, "
+                            + installedMods + " mods installed, " + alreadyMods + " already installed"
+                            + (unavailableMods > 0 ? ", " + unavailableMods + " not available for this version yet" : "") + "."));
+                    if (problem != null) {
+                        String[] message = ModsUi.describeFailure("Installing the optimisation mods", problem);
+                        all.add(ModsUi.warningBox(message[0], message[1], null));
+                    }
+                    all.addAll(notes);
+                    showStatus(all.toArray(new javafx.scene.Node[0]));
+                    appendLog("Boost: " + profile.label() + " applied.");
+                });
+            });
+        }
+
+        void disable() {
+            if (working) return;
+            settings.setBoostEnabled(false);
+            saveSettings();
+            Path minecraftDirectory = settings.minecraftDirectory();
+            try {
+                int restored = BoostOptions.restore(minecraftDirectory, line -> appendLog(line));
+                refresh();
+                showStatus(success(restored > 0 ? "Boost Mode is off and your own video settings are back (" + restored + " restored)."
+                        : "Boost Mode is off."));
+            } catch (IOException e) {
+                refresh();
+                showStatus(ModsUi.warningBox("Couldn't restore your settings", e.getMessage(), null));
+            }
+        }
     }
 
     private void showWardrobe() {

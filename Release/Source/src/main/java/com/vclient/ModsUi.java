@@ -295,6 +295,31 @@ final class ModsUi {
         return card;
     }
 
+    /** A rounded on/off switch. The callback runs with the new state when it is clicked. */
+    static StackPane switchPill(boolean on, java.util.function.Consumer<Boolean> onChange) {
+        javafx.scene.shape.Circle knob = new javafx.scene.shape.Circle(11, Color.WHITE);
+        StackPane pill = new StackPane(knob);
+        pill.setMinSize(54, 30);
+        pill.setPrefSize(54, 30);
+        pill.setMaxSize(54, 30);
+        pill.setCursor(javafx.scene.Cursor.HAND);
+        pill.setUserData(new boolean[]{on});
+        setSwitch(pill, on);
+        pill.setOnMouseClicked(event -> {
+            boolean[] state = (boolean[]) pill.getUserData();
+            onChange.accept(!state[0]);
+        });
+        return pill;
+    }
+
+    /** Moves a switch to a state without calling its callback. */
+    static void setSwitch(StackPane pill, boolean on) {
+        ((boolean[]) pill.getUserData())[0] = on;
+        pill.setAlignment(on ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+        pill.setPadding(new Insets(0, 4, 0, 4));
+        pill.setStyle("-fx-background-radius: 15; -fx-background-color: " + (on ? ACCENT : "rgba(255,255,255,0.16)") + ";");
+    }
+
     /** Sets every child of {@code cards} to the same width so a two-column grid stays aligned. */
     static void applyColumns(javafx.scene.layout.FlowPane flow, double available) {
         double gap = flow.getHgap();
