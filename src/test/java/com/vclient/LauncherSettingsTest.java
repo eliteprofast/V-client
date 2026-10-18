@@ -8,10 +8,49 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class LauncherSettingsTest {
     @TempDir
     Path temporaryDirectory;
+
+    private static PlayerAccount account(PlayerAccount.Type type, String name, String uuid) {
+        return new PlayerAccount(type.name().toLowerCase() + ":" + uuid, type, name, uuid, "token", "", "client", "", "[]", "", "");
+    }
+
+    @Test
+    void onlyTheIzyrnElyByAccountIsAdmin() {
+        LauncherSettings settings = LauncherSettings.defaults(temporaryDirectory);
+        String izyrn = LauncherSettings.ADMIN_ELY_UUID;
+
+        assertTrue(settings.isAdmin(account(PlayerAccount.Type.ELY_BY, "Izyrn", izyrn)));
+        // The same account after a rename, and the UUID with dashes, still count: the UUID is what matters.
+        assertTrue(settings.isAdmin(account(PlayerAccount.Type.ELY_BY, "NewName",
+                izyrn.replaceFirst("(.{8})(.{4})(.{4})(.{4})(.{12})", "$1-$2-$3-$4-$5"))));
+        // Someone who merely has the name Izyrn on another account, or any other type of account, does not.
+        assertFalse(settings.isAdmin(account(PlayerAccount.Type.ELY_BY, "Izyrn", "0123456789abcdef0123456789abcdef")));
+        assertFalse(settings.isAdmin(account(PlayerAccount.Type.OFFLINE, "Izyrn", izyrn)));
+        assertFalse(settings.isAdmin(account(PlayerAccount.Type.MICROSOFT, "Izyrn", izyrn)));
+        assertFalse(settings.isAdmin(null));
+    }
+
+    @Test
+    void hackerModeCanOnlyBeSwitchedOnByTheAdmin() {
+        LauncherSettings settings = LauncherSettings.defaults(temporaryDirectory);
+        PlayerAccount stranger = account(PlayerAccount.Type.ELY_BY, "Izyrn", "0123456789abcdef0123456789abcdef");
+        PlayerAccount admin = account(PlayerAccount.Type.ELY_BY, "Izyrn", LauncherSettings.ADMIN_ELY_UUID);
+
+        settings.setHackerSelected(stranger, true);
+        assertFalse(settings.hackerSelected(stranger));
+        assertFalse(settings.cheatsEnabled(stranger));
+
+        assertFalse(settings.cheatsEnabled(admin));
+        settings.setHackerSelected(admin, true);
+        assertTrue(settings.cheatsEnabled(admin));
+        settings.setHackerSelected(admin, false);
+        assertFalse(settings.cheatsEnabled(admin));
+    }
 
     @Test
     void correctsSelectedVersionSubfolderToMinecraftGameRoot() throws IOException {

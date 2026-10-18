@@ -384,7 +384,10 @@ public final class LauncherApp extends Application {
         backButton.setOnAction(event -> showHome());
         status = label("Settings save automatically.", 12, MUTED);
         footer.getChildren().addAll(backButton, status);
-        content.getChildren().addAll(title, subtitle, directoryCard, memoryCard, javaCard, accountCard, playerModeCard, footer);
+        content.getChildren().addAll(title, subtitle, directoryCard, memoryCard, javaCard, accountCard);
+        // Hacker / Cheater mode is for the admin account only, so nobody else even sees the option.
+        if (settings.isAdmin(account)) content.getChildren().add(playerModeCard);
+        content.getChildren().add(footer);
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
     }

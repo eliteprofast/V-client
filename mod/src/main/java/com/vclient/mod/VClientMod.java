@@ -25,22 +25,31 @@ public final class VClientMod implements ClientModInitializer {
     private static double lastZ;
     private static double speed;
 
-    /** Set by the launcher only for an admin account that chose Hacker / Cheater. */
-    private static final boolean CHEATS = Boolean.getBoolean("vclient.cheats");
+    /** Set by the launcher only for the admin account when it chose Hacker / Cheater. */
+    private static final boolean CHEATS_REQUESTED = Boolean.getBoolean("vclient.cheats");
+    /** The only account allowed hacker mode: Izyrn's Ely.by UUID. The launcher flag alone is not enough. */
+    private static final String ADMIN_UUID = "1331c81d33844eb6baf6a511c8298af3";
+    private static Boolean cheatsGranted;
     private static boolean xrayWas;
     private static boolean freecamOn;
     private static double camX, camY, camZ, prevCamX, prevCamY, prevCamZ;
     private static float camYaw, camPitch;
 
     public static boolean cheatsAllowed() {
-        return CHEATS;
+        if (!CHEATS_REQUESTED) return false;
+        if (cheatsGranted != null) return cheatsGranted;
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.getSession() == null || client.getSession().getUuidOrNull() == null) return false;
+        cheatsGranted = ADMIN_UUID.equals(client.getSession().getUuidOrNull().toString().replace("-", ""));
+        if (!cheatsGranted) LOGGER.warn("Hacker mode was requested, but this account is not the admin account; it stays off.");
+        return cheatsGranted;
     }
 
     @Override
     public void onInitializeClient() {
         VConfig.load();
         com.vclient.mod.cosmetics.Cosmetics.init();
-        if (CHEATS) {
+        if (CHEATS_REQUESTED && cheatsAllowed()) {
             VConfig.setEnabled(Module.FREECAM, false);
             LOGGER.info("Hacker mode unlocked: X-Ray, Reach-Hits, Speed Hack and Freecam are available.");
         }
@@ -62,7 +71,7 @@ public final class VClientMod implements ClientModInitializer {
         menuKeyWasDown = menuKeyDown;
 
         for (Module module : Module.values()) {
-            if (!module.toggleable() || (module.cheat() && !CHEATS)) continue;
+            if (!module.toggleable() || (module.cheat() && !cheatsAllowed())) continue;
             boolean down = inGame && keyDown(client, VConfig.integer(module, CommonSettings.TOGGLE_KEY.id()));
             if (down && !TOGGLE_KEYS_DOWN.getOrDefault(module, false)) {
                 boolean enabled = !VConfig.enabled(module);
@@ -92,7 +101,7 @@ public final class VClientMod implements ClientModInitializer {
 
         com.vclient.mod.cosmetics.Cosmetics.tick(client);
 
-        if (CHEATS) tickCheats(client);
+        if (cheatsAllowed()) tickCheats(client);
 
         if (client.player != null) {
             double x = client.player.getX();

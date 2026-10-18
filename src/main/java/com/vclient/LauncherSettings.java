@@ -30,8 +30,11 @@ final class LauncherSettings {
     /** VSMP Boost Mode: when on, the chosen profile's video settings, JVM flags and memory apply at every launch. */
     private boolean boostEnabled;
     private BoostProfile boostProfile = BoostProfile.BALANCED;
-    /** Ely.by account names allowed to use hacker mode. Izyrn is the first admin. */
-    private final Set<String> adminUsers = new LinkedHashSet<>(Set.of("Izyrn"));
+    /**
+     * The only admin: the Ely.by account Izyrn, identified by its permanent Ely.by UUID (names can change, the UUID
+     * cannot). It is fixed here on purpose and is not read from settings.json, so editing that file cannot grant it.
+     */
+    static final String ADMIN_ELY_UUID = "1331c81d33844eb6baf6a511c8298af3";
     /** Ids of accounts whose owner picked "Hacker / Cheater" instead of "Normal player". */
     private final Set<String> hackerAccountIds = new LinkedHashSet<>();
 
@@ -43,6 +46,11 @@ final class LauncherSettings {
         this.lastAccountId = lastAccountId;
         this.discordInvite = discordInvite;
         this.offlineMode = offlineMode;
+    }
+
+    /** Settings with defaults and nothing read from or written to disk (for tests). */
+    static LauncherSettings defaults(Path minecraftDirectory) {
+        return new LauncherSettings(minecraftDirectory, 4, 0, "", "", false);
     }
 
     static LauncherSettings load() throws IOException {
@@ -75,7 +83,6 @@ final class LauncherSettings {
         settings.boostEnabled = saved.path("boostEnabled").asBoolean(false);
         settings.boostProfile = BoostProfile.parse(saved.path("boostProfile").asText(""), BoostProfile.BALANCED);
         settings.installId = saved.path("installId").asText("");
-        saved.path("adminUsers").forEach(name -> settings.adminUsers.add(name.asText("")));
         saved.path("hackerAccountIds").forEach(id -> settings.hackerAccountIds.add(id.asText("")));
         boolean newInstallId = settings.installId.isBlank();
         if (newInstallId) settings.installId = java.util.UUID.randomUUID().toString();
@@ -126,8 +133,6 @@ final class LauncherSettings {
         saved.put("boostEnabled", boostEnabled);
         saved.put("boostProfile", boostProfile.name());
         saved.put("installId", installId);
-        var admins = saved.putArray("adminUsers");
-        adminUsers.forEach(admins::add);
         var hackers = saved.putArray("hackerAccountIds");
         hackerAccountIds.forEach(hackers::add);
         JSON.writerWithDefaultPrettyPrinter().writeValue(SETTINGS_FILE.toFile(), saved);
@@ -239,8 +244,8 @@ final class LauncherSettings {
     }
 
     boolean isAdmin(PlayerAccount account) {
-        return account != null && account.type() == PlayerAccount.Type.ELY_BY
-                && adminUsers.stream().anyMatch(name -> name.equalsIgnoreCase(account.name()));
+        return account != null && account.type() == PlayerAccount.Type.ELY_BY && account.uuid() != null
+                && ADMIN_ELY_UUID.equalsIgnoreCase(account.uuid().replace("-", ""));
     }
 
     boolean hackerSelected(PlayerAccount account) {
@@ -249,6 +254,8 @@ final class LauncherSettings {
 
     void setHackerSelected(PlayerAccount account, boolean hacker) {
         if (account == null) return;
+        // Only the admin can ever turn Hacker / Cheater on; for anyone else the choice is ignored.
+        if (hacker && !isAdmin(account)) return;
         if (hacker) hackerAccountIds.add(account.id());
         else hackerAccountIds.remove(account.id());
     }
