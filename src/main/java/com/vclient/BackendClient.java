@@ -186,31 +186,69 @@ final class BackendClient {
         return send("GET", path, null, null);
     }
 
+    /** Where every request is reported (URL, status, time, error); the launcher points it at its log. */
+    private static volatile java.util.function.Consumer<String> requestLog = line -> {};
+    private static volatile boolean debug;
+
+    /** Makes every backend request log its URL and status; with {@code debug} failures also log their stack trace. */
+    static void setRequestLog(java.util.function.Consumer<String> log, boolean debugMode) {
+        requestLog = log == null ? line -> {} : log;
+        debug = debugMode;
+    }
+
+    static String stackTrace(Throwable error) {
+        java.io.StringWriter writer = new java.io.StringWriter();
+        error.printStackTrace(new java.io.PrintWriter(writer));
+        return writer.toString();
+    }
+
+    /** Backend requests give up after this long, so a sleeping or unreachable server never means "loading forever". */
+    static final int TIMEOUT_SECONDS = 10;
+
     private JsonNode send(String method, String path, ObjectNode body, String token) throws IOException, InterruptedException {
         if (!configured()) throw new BackendException("The V-Client backend address is not set. Add it on the News page.");
-        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(baseUrl + path))
-                .timeout(Duration.ofSeconds(12))
-                .header("Accept", "application/json")
-                .header("User-Agent", "V-Client/" + AppInfo.VERSION + " (" + AppInfo.PLATFORM + ")");
-        if (token != null) request.header("Authorization", "Bearer " + token);
-        if (body != null) {
-            request.header("Content-Type", "application/json")
-                    .method(method, HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8));
-        } else {
-            request.method(method, HttpRequest.BodyPublishers.noBody());
-        }
-        HttpResponse<String> response = HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        JsonNode root;
+        String url = baseUrl + path;
+        long start = System.nanoTime();
         try {
-            root = response.body().isBlank() ? JSON.createObjectNode() : JSON.readTree(response.body());
-        } catch (IOException e) {
-            throw new IOException("The backend returned an unexpected response (HTTP " + response.statusCode() + ").", e);
+            HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofSeconds(TIMEOUT_SECONDS))
+                    .header("Accept", "application/json")
+                    .header("User-Agent", "V-Client/" + AppInfo.VERSION + " (" + AppInfo.PLATFORM + ")");
+            if (token != null) request.header("Authorization", "Bearer " + token);
+            if (body != null) {
+                request.header("Content-Type", "application/json")
+                        .method(method, HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8));
+            } else {
+                request.method(method, HttpRequest.BodyPublishers.noBody());
+            }
+            HttpResponse<String> response = HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            requestLog.accept("Backend " + method + " " + url + " -> HTTP " + response.statusCode()
+                    + " (" + (System.nanoTime() - start) / 1_000_000 + " ms)");
+            JsonNode root;
+            try {
+                root = response.body().isBlank() ? JSON.createObjectNode() : JSON.readTree(response.body());
+            } catch (IOException e) {
+                throw new IOException("The backend returned something that is not JSON (HTTP " + response.statusCode()
+                        + ", " + response.headers().firstValue("Content-Type").orElse("no content type") + "). "
+                        + "Check the backend address; a free host may still be waking up.", e);
+            }
+            if (response.statusCode() >= 400) {
+                String message = root.path("error").asText("");
+                throw new BackendException(message.isBlank() ? "The backend returned HTTP " + response.statusCode() + "." : message);
+            }
+            return root;
+        } catch (java.net.http.HttpTimeoutException e) {
+            IOException timeout = new IOException("The backend did not answer within " + TIMEOUT_SECONDS + " seconds ("
+                    + url + "). If it is hosted on a free plan it may be waking up; try again in a minute.", e);
+            requestLog.accept("Backend " + method + " " + url + " -> FAILED: " + timeout.getMessage()
+                    + (debug ? "\n" + stackTrace(e) : ""));
+            throw timeout;
+        } catch (IOException | RuntimeException e) {
+            requestLog.accept("Backend " + method + " " + url + " -> FAILED: " + e.getMessage()
+                    + (debug ? "\n" + stackTrace(e) : ""));
+            if (e instanceof RuntimeException) throw new IOException("Invalid backend request " + url + ": " + e.getMessage(), e);
+            throw e;
         }
-        if (response.statusCode() >= 400) {
-            String message = root.path("error").asText("");
-            throw new BackendException(message.isBlank() ? "The backend returned HTTP " + response.statusCode() + "." : message);
-        }
-        return root;
     }
 
     private static String encode(String value) {

@@ -57,7 +57,8 @@ public final class CosmeticsScreen extends Screen {
     private int panelX, panelY, panelW, panelH;
     private int tabsW = 74;
     private int previewW = 122;
-    private Rect grid, preview, closeButton, refreshButton, clearButton, masterToggle, equipButton, playButton;
+    private Rect grid, preview, closeButton, refreshButton, clearButton, diagnoseButton, masterToggle, equipButton, playButton;
+    private boolean showDiagnostics;
     private int columns = 1;
     private int contentHeight;
 
@@ -85,6 +86,7 @@ public final class CosmeticsScreen extends Screen {
         closeButton = new Rect(panelX + panelW - 10 - 64, buttonY, 64, 18);
         refreshButton = new Rect(panelX + 10, buttonY, 64, 18);
         clearButton = new Rect(refreshButton.x() + 68, buttonY, 82, 18);
+        diagnoseButton = new Rect(clearButton.x() + 86, buttonY, 72, 18);
         masterToggle = new Rect(panelX + panelW - 10 - 44, panelY + 10, 44, 14);
         int detailBottom = bottom + 2;
         equipButton = new Rect(preview.x(), detailBottom - 18, previewW, 16);
@@ -153,9 +155,18 @@ public final class CosmeticsScreen extends Screen {
         boolean master = CosmeticState.enabled();
         drawPill(context, masterToggle, master ? "ON" : "OFF", master ? 0xFF244A38 : 0xFF482332,
                 master ? GOOD : BAD, mouseX, mouseY);
-        String status = textRenderer.trimToWidth(CosmeticCatalog.status(), panelW - 190);
+        CosmeticCatalog.State loadState = CosmeticCatalog.state();
+        String statusText = (CosmeticNet.debug() ? "[DEBUG] " : "") + CosmeticCatalog.status();
+        String status = textRenderer.trimToWidth(statusText, panelW - 190);
+        int statusColor = loadState == CosmeticCatalog.State.FAILED ? BAD
+                : loadState == CosmeticCatalog.State.LOADING ? ACCENT : 0xFF7F7FA6;
         context.drawText(textRenderer, status, masterToggle.x() - 8 - textRenderer.getWidth(status), panelY + 13,
-                0xFF7F7FA6, false);
+                statusColor, false);
+        if (loadState == CosmeticCatalog.State.FAILED && !CosmeticCatalog.error().isEmpty()) {
+            String detail = textRenderer.trimToWidth("Press REFRESH to retry, or DIAGNOSE to see what is wrong.", panelW - 190);
+            context.drawText(textRenderer, detail, masterToggle.x() - 8 - textRenderer.getWidth(detail), panelY + 24,
+                    0xFF9A7A7A, false);
+        }
 
         drawTabs(context, mouseX, mouseY);
         drawChips(context, mouseX, mouseY);
@@ -165,6 +176,7 @@ public final class CosmeticsScreen extends Screen {
 
         drawButton(context, refreshButton, "REFRESH", 0xFF292642, true, mouseX, mouseY);
         drawButton(context, clearButton, "UNEQUIP ALL", 0xFF482332, true, mouseX, mouseY);
+        drawButton(context, diagnoseButton, showDiagnostics ? "HIDE" : "DIAGNOSE", 0xFF292642, true, mouseX, mouseY);
         drawButton(context, closeButton, "DONE", ACCENT, true, mouseX, mouseY);
     }
 
@@ -197,7 +209,56 @@ public final class CosmeticsScreen extends Screen {
         }
     }
 
+    private void drawDiagnostics(DrawContext context) {
+        int x = grid.x() + 4;
+        int y = grid.y() + 2;
+        int width = grid.w() - 8;
+        context.enableScissor(grid.x(), grid.y(), grid.x() + grid.w(), grid.y() + grid.h());
+        context.drawText(textRenderer, CosmeticDiagnostics.running() ? "Checking..." : "Diagnostics", x, y, ACCENT, false);
+        y += 12;
+        for (CosmeticDiagnostics.Check check : CosmeticDiagnostics.checks()) {
+            int color = switch (check.result()) {
+                case OK -> GOOD;
+                case FAIL -> BAD;
+                case RUNNING -> ACCENT;
+                case INFO -> MUTED;
+            };
+            String tag = switch (check.result()) {
+                case OK -> "OK ";
+                case FAIL -> "FAIL ";
+                case RUNNING -> "... ";
+                case INFO -> "i ";
+            };
+            context.drawText(textRenderer, tag + check.name(), x, y, color, false);
+            y += 10;
+            for (net.minecraft.text.OrderedText line : textRenderer.wrapLines(Text.literal(check.detail()), width - 8)) {
+                if (y > grid.y() + grid.h() - 10) break;
+                context.drawText(textRenderer, line, x + 6, y, 0xFFB3B3CF, false);
+                y += 9;
+            }
+        }
+        if (y < grid.y() + grid.h() - 22) {
+            y += 4;
+            context.drawText(textRenderer, "Recent requests", x, y, ACCENT, false);
+            y += 11;
+            java.util.List<CosmeticNet.Request> recent = CosmeticNet.recent();
+            for (int i = recent.size() - 1; i >= 0 && y < grid.y() + grid.h() - 9; i--) {
+                CosmeticNet.Request request = recent.get(i);
+                String line = request.method() + " " + request.url().replaceFirst("^https?://", "") + "  "
+                        + (request.error() != null ? request.error() : request.status() + " " + request.millis() + "ms");
+                context.drawText(textRenderer, textRenderer.trimToWidth(line, width - 4), x, y,
+                        request.error() != null || request.status() >= 400 ? BAD : MUTED, false);
+                y += 9;
+            }
+        }
+        context.disableScissor();
+    }
+
     private void drawGrid(DrawContext context, int mouseX, int mouseY) {
+        if (showDiagnostics) {
+            drawDiagnostics(context);
+            return;
+        }
         if (visible.isEmpty()) {
             String empty = "Nothing here yet.";
             context.drawText(textRenderer, empty, grid.x() + (grid.w() - textRenderer.getWidth(empty)) / 2,
@@ -306,6 +367,13 @@ public final class CosmeticsScreen extends Screen {
         }
         boolean unlocked = CosmeticCatalog.unlocked(selected);
         boolean equipped = CosmeticState.isEquipped(selected);
+        if (CosmeticTextures.failed(selected)) {
+            List<OrderedText> reason = textRenderer.wrapLines(
+                    Text.literal("Could not load its texture: " + CosmeticTextures.failureReason(selected)), previewW);
+            for (int i = 0; i < reason.size() && i < 3; i++) {
+                context.drawText(textRenderer, reason.get(i), x, playButton.y() - 32 + i * 9, BAD, false);
+            }
+        }
         if (selected.slot() == CosmeticSlot.EMOTE) {
             drawButton(context, playButton, Emotes.active() ? "STOP" : "PLAY EMOTE", 0xFF292642, true, mouseX, mouseY);
         }
@@ -350,7 +418,13 @@ public final class CosmeticsScreen extends Screen {
             return true;
         }
         if (refreshButton.contains(x, y)) {
+            CosmeticTextures.retryFailed();
             CosmeticCatalog.refreshAsync();
+            return true;
+        }
+        if (diagnoseButton.contains(x, y)) {
+            showDiagnostics = !showDiagnostics;
+            if (showDiagnostics) CosmeticDiagnostics.run();
             return true;
         }
         if (clearButton.contains(x, y)) {

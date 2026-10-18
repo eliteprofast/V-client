@@ -14,6 +14,8 @@ import org.lwjgl.glfw.GLFW;
 public final class Cosmetics {
     private static boolean menuKeyWasDown;
     private static boolean emoteKeyWasDown;
+    private static int preloadedKey = -1;
+    private static boolean diagnosedOnJoin;
 
     private Cosmetics() {}
 
@@ -28,6 +30,19 @@ public final class Cosmetics {
         if (client.player == null) {
             Emotes.stop();
             return;
+        }
+        // Load what is equipped before it is first drawn, so there is no pop-in and a failure shows up at once.
+        int key = CosmeticState.version() * 31 + CosmeticCatalog.revision();
+        if (key != preloadedKey) {
+            preloadedKey = key;
+            for (CosmeticSlot slot : CosmeticSlot.values()) {
+                Cosmetic equipped = CosmeticState.effective(slot);
+                if (equipped != null && equipped.definition().has("texture")) CosmeticTextures.current(equipped);
+            }
+        }
+        if (!diagnosedOnJoin && CosmeticNet.debug()) {
+            diagnosedOnJoin = true;
+            CosmeticDiagnostics.run();
         }
         boolean inGame = client.currentScreen == null;
         boolean menuDown = inGame && keyDown(client, VConfig.integer(Module.COSMETICS, "menuKey"));

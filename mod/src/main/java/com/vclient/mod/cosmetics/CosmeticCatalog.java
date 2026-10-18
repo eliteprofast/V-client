@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -32,8 +33,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * offline), overlays the last catalog downloaded from the backend, then refreshes that in the background.
  * Schema 1 of the server document is documented in docs/COSMETICS_API.md; unknown fields and unknown
  * categories are ignored so a newer server never breaks an older client.
+ *
+ * Loading is a small state machine, {@link State#LOADING} then {@link State#SUCCESS} or {@link State#FAILED}.
+ * It can never stay in LOADING: every refresh has a 10-second deadline and every failure, including a
+ * malformed response, ends in FAILED with a message the menu shows.
  */
 public final class CosmeticCatalog {
+    public enum State { LOADING, SUCCESS, FAILED }
+
     private static final Gson GSON = new Gson();
     private static final String BUILTIN_RESOURCE = "/vclient/builtin-cosmetics.json";
     private static final int SCHEMA = 1;
@@ -43,7 +50,9 @@ public final class CosmeticCatalog {
     private static volatile List<Cosmetic> items = List.of();
     private static volatile Map<String, Cosmetic> byId = Map.of();
     private static volatile Set<String> owned = Set.of();
+    private static volatile State state = State.LOADING;
     private static volatile String status = "Loading cosmetics...";
+    private static volatile String error = "";
     private static volatile int revision;
     private static final AtomicBoolean REFRESHING = new AtomicBoolean();
 
@@ -52,11 +61,10 @@ public final class CosmeticCatalog {
     /** Loads the bundled and cached catalogs synchronously (both small, local) and starts an online refresh. */
     public static void init() {
         List<JsonObject> builtin = new ArrayList<>();
-        try (Reader reader = new InputStreamReader(CosmeticCatalog.class.getResourceAsStream(BUILTIN_RESOURCE),
-                StandardCharsets.UTF_8)) {
-            collect(GSON.fromJson(reader, JsonObject.class), builtin);
+        try {
+            builtin = readBuiltin();
         } catch (IOException | RuntimeException e) {
-            VClientMod.LOGGER.warn("[Cosmetics] Could not read the bundled catalog.", e);
+            CosmeticNet.logError("Could not read the bundled catalog", e);
         }
         Path cached = CosmeticNet.directory().resolve("catalog.json");
         JsonObject remote = null;
@@ -67,45 +75,72 @@ public final class CosmeticCatalog {
             Path ownedFile = CosmeticNet.directory().resolve("owned.json");
             if (Files.isRegularFile(ownedFile)) owned = readOwned(Files.readString(ownedFile, StandardCharsets.UTF_8));
         } catch (IOException | RuntimeException e) {
-            VClientMod.LOGGER.warn("[Cosmetics] Ignoring unreadable cached catalog: {}", e.getMessage());
+            CosmeticNet.logError("Ignoring the unreadable cached catalog", e);
         }
-        publish(builtin, remote, CosmeticNet.backendUrl().isEmpty() ? "Built-in cosmetics (no backend configured)"
-                : "Cached catalog");
+        boolean hasBackend = !CosmeticNet.backendUrl().isEmpty();
+        publish(builtin, remote, hasBackend ? "Cached catalog" : "Built-in cosmetics (no backend configured)",
+                hasBackend ? State.LOADING : State.SUCCESS, "");
+        VClientMod.LOGGER.info("[Cosmetics] Backend: {}", hasBackend ? CosmeticNet.backendUrl() : "none configured");
         refreshAsync();
     }
 
-    /** Fetches the catalog and the player's owned items from the backend without blocking the game. */
+    /**
+     * Fetches the catalog and the player's owned items from the backend without blocking the game. Always
+     * finishes within about 10 seconds, in {@link State#SUCCESS} or {@link State#FAILED}.
+     */
     public static void refreshAsync() {
         String base = CosmeticNet.backendUrl();
-        if (base.isEmpty() || !REFRESHING.compareAndSet(false, true)) return;
+        if (base.isEmpty()) {
+            state = State.SUCCESS;
+            return;
+        }
+        if (!REFRESHING.compareAndSet(false, true)) return;
+        state = State.LOADING;
+        error = "";
         status = "Updating cosmetics...";
-        CosmeticNet.run(() -> {
+        VClientMod.LOGGER.info("[Cosmetics] Refreshing the catalog from {}", base);
+        CosmeticNet.supply(() -> {
             try {
                 fetch(base);
+                return Boolean.TRUE;
             } catch (IOException e) {
-                status = "Offline - showing saved cosmetics";
-                VClientMod.LOGGER.warn("[Cosmetics] Catalog refresh failed: {}", e.getMessage());
+                throw new java.util.concurrent.CompletionException(e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-            } finally {
-                REFRESHING.set(false);
+                throw new java.util.concurrent.CompletionException(e);
             }
+        }).whenComplete((ignored, failure) -> {
+            if (failure != null) fail(base, failure);
+            REFRESHING.set(false);
         });
+    }
+
+    private static void fail(String base, Throwable failure) {
+        CosmeticNet.logError("Catalog refresh from " + base + " failed", failure);
+        error = CosmeticNet.describe(failure);
+        status = "Could not load the online catalog: " + error;
+        state = State.FAILED;
+        revision++;
     }
 
     private static void fetch(String base) throws IOException, InterruptedException {
         Path directory = CosmeticNet.directory();
         Path etagFile = directory.resolve("catalog.etag");
         String etag = Files.isRegularFile(etagFile) ? Files.readString(etagFile, StandardCharsets.UTF_8).strip() : "";
-        VClientMod.LOGGER.info("[Cosmetics] Requesting catalog from {}", base);
         HttpResponse<byte[]> response = CosmeticNet.get(URI.create(base + "/api/cosmetics/catalog"),
                 Files.isRegularFile(directory.resolve("catalog.json")) ? etag : "");
         JsonObject remote = null;
         if (response.statusCode() == 200) {
             String text = new String(response.body(), StandardCharsets.UTF_8);
-            remote = GSON.fromJson(text, JsonObject.class);
-            if (remote == null || (remote.has("schema") && remote.get("schema").getAsInt() > SCHEMA + 5)) {
-                throw new IOException("Unsupported catalog document.");
+            try {
+                remote = GSON.fromJson(text, JsonObject.class);
+            } catch (com.google.gson.JsonParseException e) {
+                String type = response.headers().firstValue("Content-Type").orElse("unknown content type");
+                throw new IOException("The backend at " + base + " did not return a catalog (" + type + "). "
+                        + "Check the backend address; if it is hosted on a free plan it may still be waking up.", e);
+            }
+            if (remote == null || !(remote.get("items") instanceof JsonArray)) {
+                throw new IOException("The backend answered 200 but the document has no \"items\" list.");
             }
             CosmeticNet.write(directory.resolve("catalog.json"), response.body());
             response.headers().firstValue("ETag").ifPresent(value -> {
@@ -118,7 +153,8 @@ public final class CosmeticCatalog {
         } else if (response.statusCode() == 304) {
             VClientMod.LOGGER.info("[Cosmetics] Catalog unchanged (304).");
         } else {
-            throw new IOException("Catalog request returned HTTP " + response.statusCode());
+            throw new IOException("The catalog request returned HTTP " + response.statusCode()
+                    + (response.statusCode() == 404 ? " - this backend does not have the cosmetics API (is it redeployed?)" : ""));
         }
 
         UUID player = playerId();
@@ -127,25 +163,34 @@ public final class CosmeticCatalog {
                 HttpResponse<byte[]> ownedResponse = CosmeticNet.get(URI.create(
                         base + "/api/cosmetics/owned/" + player.toString().replace("-", "")), null);
                 if (ownedResponse.statusCode() == 200) {
-                    String text = new String(ownedResponse.body(), StandardCharsets.UTF_8);
-                    owned = readOwned(text);
+                    owned = readOwned(new String(ownedResponse.body(), StandardCharsets.UTF_8));
                     CosmeticNet.write(directory.resolve("owned.json"), ownedResponse.body());
+                } else {
+                    VClientMod.LOGGER.warn("[Cosmetics] Owned-items request returned HTTP {}", ownedResponse.statusCode());
                 }
-            } catch (IOException e) {
-                VClientMod.LOGGER.warn("[Cosmetics] Could not load owned cosmetics: {}", e.getMessage());
+            } catch (IOException | RuntimeException e) {
+                CosmeticNet.logError("Could not load owned cosmetics (continuing without them)", e);
             }
+        } else {
+            VClientMod.LOGGER.warn("[Cosmetics] No player UUID is available; skipping the owned-items request.");
         }
 
+        List<JsonObject> builtin = readBuiltin();
+        if (remote == null && Files.isRegularFile(directory.resolve("catalog.json"))) {
+            remote = GSON.fromJson(Files.readString(directory.resolve("catalog.json"), StandardCharsets.UTF_8),
+                    JsonObject.class);
+        }
+        publish(builtin, remote, "Online - updated " + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")),
+                State.SUCCESS, "");
+    }
+
+    private static List<JsonObject> readBuiltin() throws IOException {
         List<JsonObject> builtin = new ArrayList<>();
         try (Reader reader = new InputStreamReader(CosmeticCatalog.class.getResourceAsStream(BUILTIN_RESOURCE),
                 StandardCharsets.UTF_8)) {
             collect(GSON.fromJson(reader, JsonObject.class), builtin);
         }
-        if (remote == null && Files.isRegularFile(directory.resolve("catalog.json"))) {
-            remote = GSON.fromJson(Files.readString(directory.resolve("catalog.json"), StandardCharsets.UTF_8),
-                    JsonObject.class);
-        }
-        publish(builtin, remote, "Online - updated " + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")));
+        return builtin;
     }
 
     private static UUID playerId() {
@@ -167,7 +212,8 @@ public final class CosmeticCatalog {
         for (JsonElement element : array) if (element.isJsonObject()) into.add(element.getAsJsonObject());
     }
 
-    private static void publish(List<JsonObject> builtin, JsonObject remote, String newStatus) {
+    private static void publish(List<JsonObject> builtin, JsonObject remote, String newStatus, State newState,
+                                String newError) {
         Map<String, Cosmetic> merged = new LinkedHashMap<>();
         for (JsonObject json : builtin) {
             Cosmetic cosmetic = Cosmetic.parse(json, true);
@@ -188,9 +234,11 @@ public final class CosmeticCatalog {
         sorted.sort(Comparator.comparingInt(Cosmetic::sort).thenComparing(Cosmetic::name, String.CASE_INSENSITIVE_ORDER));
         byId = Map.copyOf(merged);
         items = List.copyOf(sorted);
+        error = newError;
         status = newStatus + " - " + sorted.size() + " items";
+        state = newState;
         revision++;
-        VClientMod.LOGGER.info("[Cosmetics] Catalog ready: {} items ({}).", sorted.size(), newStatus);
+        VClientMod.LOGGER.info("[Cosmetics] Catalog {}: {} items ({}).", newState, sorted.size(), newStatus);
     }
 
     public static List<Cosmetic> items() {
@@ -201,11 +249,20 @@ public final class CosmeticCatalog {
         return id == null ? null : byId.get(id);
     }
 
+    public static State state() {
+        return state;
+    }
+
     public static String status() {
         return status;
     }
 
-    /** Increases whenever the item list changes, so screens know to rebuild. */
+    /** Why the last online refresh failed, or empty. */
+    public static String error() {
+        return error;
+    }
+
+    /** Increases whenever the item list or the load state changes, so screens know to rebuild. */
     public static int revision() {
         return revision;
     }

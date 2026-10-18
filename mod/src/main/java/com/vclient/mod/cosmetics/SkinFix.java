@@ -44,41 +44,87 @@ public final class SkinFix {
 
     private SkinFix() {}
 
+    private static volatile String skinStatus = "not supplied by the launcher";
+    private static volatile String capeStatus = "not supplied by the launcher";
+
     public static void init() {
-        if (SKIN_URL.isEmpty() && CAPE_URL.isEmpty()) return;
+        MinecraftClient client = MinecraftClient.getInstance();
+        String user = client != null && client.getSession() != null ? client.getSession().getUsername() : "?";
+        VClientMod.LOGGER.info("[Skin] Signed in as {} (launcher skin uuid: {}).", user,
+                LAUNCHER_UUID.isEmpty() ? "none - not an Ely.by launch" : LAUNCHER_UUID);
+        if (SKIN_URL.isEmpty() && CAPE_URL.isEmpty()) {
+            VClientMod.LOGGER.info("[Skin] The launcher did not supply a skin, so the game's own lookup is used.");
+            return;
+        }
         VClientMod.LOGGER.info("[Skin] Launcher supplied a skin for {} (model {}): {}", LAUNCHER_UUID, MODEL, SKIN_URL);
         if (!SKIN_URL.isEmpty()) load(SKIN_URL, true);
         if (!CAPE_URL.isEmpty()) load(CAPE_URL, false);
     }
 
+    /** One line for the menu and the diagnostics: where the launcher-supplied skin and cape stand. */
+    public static String status() {
+        return "skin: " + skinStatus + "; cape: " + capeStatus;
+    }
+
+    public static boolean skinFailed() {
+        return skinStatus.startsWith("failed");
+    }
+
+    private static void setStatus(boolean skin, String value) {
+        if (skin) skinStatus = value;
+        else capeStatus = value;
+    }
+
+    /**
+     * Downloads one launcher-supplied texture without ever blocking a pool thread (chaining on the download
+     * future), so the skin and the cape load side by side and a failure is reported instead of hanging.
+     */
     private static void load(String address, boolean skin) {
         String label = skin ? "skin" : "cape";
-        CosmeticNet.run(() -> {
+        URI uri;
+        try {
+            uri = URI.create(address);
+            if (!"https".equals(uri.getScheme()) || uri.getHost() == null) {
+                throw new IOException("only https texture addresses are accepted");
+            }
+        } catch (IOException | IllegalArgumentException e) {
+            setStatus(skin, "failed: invalid address (" + e.getMessage() + ")");
+            VClientMod.LOGGER.warn("[Skin] The launcher {} address {} is not usable: {}", label, address, e.getMessage());
+            return;
+        }
+        Path cache = CosmeticNet.directory().getParent().resolve("skin-cache")
+                .resolve(CosmeticNet.sha256(address.getBytes(java.nio.charset.StandardCharsets.UTF_8)) + ".png");
+        setStatus(skin, "downloading");
+        VClientMod.LOGGER.info("[Skin] Fetching {} texture {} (cache {}).", label, uri, cache);
+        CosmeticNet.download(uri, "", cache).whenComplete((bytes, error) -> {
+            if (error != null) {
+                String reason = CosmeticNet.describe(error);
+                setStatus(skin, "failed: " + reason);
+                VClientMod.LOGGER.warn("[Skin] Could not download the {} texture {}: {}", label, uri, reason);
+                return;
+            }
+            VClientMod.LOGGER.info("[Skin] {} download finished ({} bytes).", label, bytes.length);
             try {
-                URI uri = URI.create(address);
-                if (!"https".equals(uri.getScheme()) || uri.getHost() == null) {
-                    throw new IOException("only https texture addresses are accepted");
-                }
-                Path cache = CosmeticNet.directory().getParent().resolve("skin-cache")
-                        .resolve(CosmeticNet.sha256(address.getBytes(java.nio.charset.StandardCharsets.UTF_8)) + ".png");
-                VClientMod.LOGGER.info("[Skin] Fetching {} texture (cache {}).", label, cache);
-                byte[] bytes = CosmeticNet.download(uri, "", cache).join();
-                VClientMod.LOGGER.info("[Skin] {} download finished ({} bytes).", label, bytes.length);
                 NativeImage image = skin ? processSkin(NativeImage.read(bytes)) : NativeImage.read(bytes);
                 MinecraftClient client = MinecraftClient.getInstance();
                 client.execute(() -> {
-                    Identifier id = Identifier.of("vclient", "launcher/" + label + "/" + Integer.toHexString(address.hashCode()));
-                    client.getTextureManager().registerTexture(id,
-                            new NativeImageBackedTexture(() -> "vclient launcher " + label, image));
-                    if (skin) skinTexture = id;
-                    else capeTexture = id;
-                    loadedVersion++;
-                    VClientMod.LOGGER.info("[Skin] {} texture registered as {}.", label, id);
+                    try {
+                        Identifier id = Identifier.of("vclient", "launcher/" + label + "/" + Integer.toHexString(address.hashCode()));
+                        client.getTextureManager().registerTexture(id,
+                                new NativeImageBackedTexture(() -> "vclient launcher " + label, image));
+                        if (skin) skinTexture = id;
+                        else capeTexture = id;
+                        loadedVersion++;
+                        setStatus(skin, "ready");
+                        VClientMod.LOGGER.info("[Skin] {} texture registered as {}.", label, id);
+                    } catch (RuntimeException e) {
+                        setStatus(skin, "failed: could not create the GPU texture (" + e.getMessage() + ")");
+                        CosmeticNet.logError("Registering the " + label + " texture", e);
+                    }
                 });
             } catch (IOException | RuntimeException e) {
-                Throwable cause = e instanceof java.util.concurrent.CompletionException && e.getCause() != null
-                        ? e.getCause() : e;
-                VClientMod.LOGGER.warn("[Skin] Could not load the launcher {}: {}", label, cause.getMessage());
+                setStatus(skin, "failed: the file is not a usable " + label + " image (" + e.getMessage() + ")");
+                CosmeticNet.logError("Decoding the " + label + " texture from " + uri, e);
             }
         });
     }
@@ -89,9 +135,7 @@ public final class SkinFix {
      */
     public static SkinTextures apply(UUID id, SkinTextures original) {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.getSession() == null || !id.equals(client.getSession().getUuidOrNull())) {
-            return original;
-        }
+        if (!isLocalPlayer(client, id)) return original;
         int state = CosmeticState.version();
         if (original == lastInput && state == lastStateVersion && loadedVersion == lastSkinVersion
                 && CosmeticCatalog.revision() == lastCatalogRevision) {
@@ -104,6 +148,25 @@ public final class SkinFix {
         lastSkinVersion = loadedVersion;
         lastCatalogRevision = CosmeticCatalog.revision();
         return result;
+    }
+
+    private static boolean loggedIdentity;
+
+    /**
+     * Whether {@code id} is the local player. On a single-player world it is the account's own UUID, but on an
+     * offline-mode ("cracked") server the server gives you a different UUID derived from your name, so the
+     * player entity's UUID and the signed-in name are checked as well.
+     */
+    private static boolean isLocalPlayer(MinecraftClient client, UUID id) {
+        if (client == null || client.getSession() == null) return false;
+        boolean local = id.equals(client.getSession().getUuidOrNull())
+                || (client.player != null && id.equals(client.player.getUuid()));
+        if (local && !loggedIdentity && !id.equals(client.getSession().getUuidOrNull())) {
+            loggedIdentity = true;
+            VClientMod.LOGGER.info("[Skin] The server uses a different UUID for you ({}) than your account ({}); "
+                    + "applying the launcher skin to it.", id, client.getSession().getUuidOrNull());
+        }
+        return local;
     }
 
     private static SkinTextures compute(SkinTextures original) {

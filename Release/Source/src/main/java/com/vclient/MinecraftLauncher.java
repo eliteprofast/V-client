@@ -664,8 +664,10 @@ final class MinecraftLauncher {
             try {
                 ElyByAuthService.SkinProfile profile = elyByAuthService.fetchSkinProfile(
                         account.uuid(), account.name(), onOutput);
-                if (profile.hasSkin()) skin = profile.skinUrl();
-                if (!profile.capeUrl().isBlank()) cape = profile.capeUrl();
+                // The fresh profile is the truth: a cape or skin removed on Ely.by must not linger from a
+                // saved copy (a stale cape address would only produce a 404 in the game).
+                skin = profile.skinUrl();
+                cape = profile.capeUrl();
                 model = profile.model();
             } catch (IOException e) {
                 onOutput.accept("Ely.by skin: could not refresh the skin, using the last saved one ("

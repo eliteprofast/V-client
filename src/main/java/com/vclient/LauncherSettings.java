@@ -25,6 +25,8 @@ final class LauncherSettings {
     private String backendToken = "";
     private String installId = "";
     private boolean autoUpdate = true;
+    /** Logs every backend request with its URL, status and stack traces of failures. */
+    private boolean debugMode;
     /** Ely.by account names allowed to use hacker mode. Izyrn is the first admin. */
     private final Set<String> adminUsers = new LinkedHashSet<>(Set.of("Izyrn"));
     /** Ids of accounts whose owner picked "Hacker / Cheater" instead of "Normal player". */
@@ -63,6 +65,7 @@ final class LauncherSettings {
         settings.backendUrl = saved.path("backendUrl").asText("");
         settings.backendToken = saved.path("backendToken").asText("");
         settings.autoUpdate = saved.path("autoUpdate").asBoolean(true);
+        settings.debugMode = saved.path("debugMode").asBoolean(false);
         settings.installId = saved.path("installId").asText("");
         saved.path("adminUsers").forEach(name -> settings.adminUsers.add(name.asText("")));
         saved.path("hackerAccountIds").forEach(id -> settings.hackerAccountIds.add(id.asText("")));
@@ -111,6 +114,7 @@ final class LauncherSettings {
         saved.put("backendUrl", backendUrl);
         saved.put("backendToken", backendToken);
         saved.put("autoUpdate", autoUpdate);
+        saved.put("debugMode", debugMode);
         saved.put("installId", installId);
         var admins = saved.putArray("adminUsers");
         adminUsers.forEach(admins::add);
@@ -168,6 +172,14 @@ final class LauncherSettings {
 
     void setOfflineMode(boolean offlineMode) {
         this.offlineMode = offlineMode;
+    }
+
+    boolean debugMode() {
+        return debugMode;
+    }
+
+    void setDebugMode(boolean debugMode) {
+        this.debugMode = debugMode;
     }
 
     String backendUrl() {

@@ -140,6 +140,7 @@ public final class LauncherApp extends Application {
         });
         gameLauncher.setCheatPermission(settings::cheatsEnabled);
         gameLauncher.setAdminPermission(settings::isAdmin);
+        BackendClient.setRequestLog(line -> Platform.runLater(() -> appendLog(line)), settings.debugMode());
         gameLauncher.setBackendUrl(() -> BackendClient.resolveUrl(settings.backendUrl()));
         accounts.addAll(accountStore.load());
         localFriends.addAll(friendsStore.load());
@@ -620,6 +621,14 @@ public final class LauncherApp extends Application {
         boolean adminUnlock = account != null && settings.isAdmin(account);
         BackendClient client = backend();
         Label status = label("Loading cosmetics...", 12, MUTED);
+        status.setWrapText(true);
+        java.util.function.BiConsumer<String, Boolean> setStatus = (message, failed) -> {
+            status.setText(message);
+            status.setTextFill(Color.web(failed ? "#ff9aa5" : MUTED));
+        };
+        VBox diagnostics = new VBox(4);
+        diagnostics.setVisible(false);
+        diagnostics.setManaged(false);
         VBox list = new VBox(8);
         HBox tabs = new HBox(6);
         HBox tiers = new HBox(6);
@@ -712,41 +721,112 @@ public final class LauncherApp extends Application {
             render[0].run();
         });
         Runnable load = () -> {
-            status.setText("Loading cosmetics...");
+            setStatus.accept("Loading cosmetics...", false);
+            refresh.setDisable(true);
             String uuid = account == null ? "" : account.uuid();
             boolean online = client.configured() && !settings.offlineMode();
             boolean checkOwned = account != null && account.type() != PlayerAccount.Type.OFFLINE && !uuid.isBlank();
-            executor.execute(() -> {
-                java.util.Set<String> ownedNow = new java.util.HashSet<>();
-                String message;
-                com.fasterxml.jackson.databind.JsonNode remote = null;
+            appendLog("Cosmetics: loading the catalog (backend " + (client.configured() ? client.baseUrl() : "not set")
+                    + ", " + (online ? "online" : "not contacting it") + ", account "
+                    + (account == null ? "none" : account.name() + " / " + account.type().label()) + ").");
+            // Every outcome ends in a result: success, or a failure with the real reason. A 10 second limit
+            // (plus a little for the request itself) guarantees the page can never wait forever.
+            CompletableFuture.supplyAsync(() -> {
                 try {
+                    com.fasterxml.jackson.databind.JsonNode remote = null;
+                    java.util.Set<String> ownedNow = new java.util.HashSet<>();
                     if (online) {
                         remote = client.cosmeticsCatalog();
-                        if (checkOwned) ownedNow.addAll(client.ownedCosmetics(uuid));
+                        if (checkOwned) {
+                            try {
+                                ownedNow.addAll(client.ownedCosmetics(uuid));
+                            } catch (IOException e) {
+                                appendLogLater("Cosmetics: owned items could not be loaded (" + e.getMessage()
+                                        + "); continuing without them.");
+                            }
+                        }
                     }
-                    message = online ? "Online catalog loaded." : "Showing the built-in cosmetics"
-                            + (client.configured() ? " (offline mode)." : " (set the backend address on the News page for more).");
+                    return new Object[]{CosmeticsStore.merge(CosmeticsStore.builtIn(), remote), ownedNow};
                 } catch (IOException | InterruptedException e) {
                     if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-                    message = "Could not reach the cosmetics server (" + e.getMessage() + "); showing the built-in cosmetics.";
+                    throw new java.util.concurrent.CompletionException(e);
                 }
-                List<CosmeticsStore.Item> loaded = CosmeticsStore.merge(CosmeticsStore.builtIn(), remote);
-                String finalMessage = message + " " + loaded.size() + " items.";
-                Platform.runLater(() -> {
-                    items.clear();
-                    items.addAll(loaded);
+            }, executor).orTimeout(CosmeticsDiagnostics.TIMEOUT_SECONDS + 2, TimeUnit.SECONDS)
+                    .whenComplete((result, failure) -> Platform.runLater(() -> {
+                refresh.setDisable(false);
+                List<CosmeticsStore.Item> loaded;
+                if (failure == null) {
+                    @SuppressWarnings("unchecked")
+                    List<CosmeticsStore.Item> merged = (List<CosmeticsStore.Item>) ((Object[]) result)[0];
+                    @SuppressWarnings("unchecked")
+                    java.util.Set<String> ownedNow = (java.util.Set<String>) ((Object[]) result)[1];
+                    loaded = merged;
                     owned.clear();
                     owned.addAll(ownedNow);
-                    status.setText(finalMessage);
-                    render[0].run();
-                });
-            });
+                    setStatus.accept((online ? "Online catalog loaded. " : "Showing the built-in cosmetics"
+                            + (client.configured() ? " (offline mode). " : " (set the backend address on the News page for more). "))
+                            + loaded.size() + " items.", false);
+                } else {
+                    Throwable cause = failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null
+                            ? failure.getCause() : failure;
+                    String reason = cause instanceof java.util.concurrent.TimeoutException
+                            ? "timed out after " + CosmeticsDiagnostics.TIMEOUT_SECONDS + " seconds"
+                            : CosmeticsDiagnostics.describe(cause);
+                    appendLog("Cosmetics: could not load the online catalog: " + reason
+                            + (settings.debugMode() ? "\n" + BackendClient.stackTrace(cause) : ""));
+                    loaded = CosmeticsStore.merge(CosmeticsStore.builtIn(), null);
+                    setStatus.accept("Could not load the online catalog: " + reason + ". Showing the built-in "
+                            + loaded.size() + " cosmetics. Press REFRESH to retry or DIAGNOSE to find the problem.", true);
+                }
+                items.clear();
+                items.addAll(loaded);
+                render[0].run();
+            }));
         };
         refresh.setOnAction(event -> load.run());
 
+        Button diagnose = button("DIAGNOSE", "#292642", 10);
+        diagnose.setOnAction(event -> {
+            diagnose.setDisable(true);
+            diagnostics.getChildren().setAll(label("Checking... (each check gives up after "
+                    + CosmeticsDiagnostics.TIMEOUT_SECONDS + " seconds)", 11, ACCENT));
+            diagnostics.setVisible(true);
+            diagnostics.setManaged(true);
+            CosmeticsDiagnostics.Context context = new CosmeticsDiagnostics.Context(
+                    BackendClient.resolveUrl(settings.backendUrl()), account, settings.backendToken(), settings.offlineMode());
+            appendLog("Diagnostics: started.");
+            executor.execute(() -> {
+                CosmeticsDiagnostics.run(context, check -> Platform.runLater(() -> {
+                    String color = switch (check.result()) {
+                        case OK -> "#7cf29a";
+                        case FAIL -> "#ff9aa5";
+                        case INFO -> MUTED;
+                    };
+                    Label line = label((check.result() == CosmeticsDiagnostics.Result.OK ? "OK    "
+                            : check.result() == CosmeticsDiagnostics.Result.FAIL ? "FAIL  " : "info  ")
+                            + check.name() + " - " + check.detail(), 11, color);
+                    line.setWrapText(true);
+                    diagnostics.getChildren().add(line);
+                    appendLog("Diagnostics: " + check.result() + " " + check.name() + " - " + check.detail());
+                }));
+                Platform.runLater(() -> {
+                    diagnose.setDisable(false);
+                    appendLog("Diagnostics: finished.");
+                });
+            });
+        });
+        javafx.scene.control.CheckBox debugBox = new javafx.scene.control.CheckBox(
+                "Debug mode (log every request, URL, status and stack traces)");
+        debugBox.setSelected(settings.debugMode());
+        debugBox.setTextFill(Color.web(MUTED));
+        debugBox.setOnAction(event -> {
+            settings.setDebugMode(debugBox.isSelected());
+            BackendClient.setRequestLog(line -> Platform.runLater(() -> appendLog(line)), settings.debugMode());
+            saveSettings();
+            appendLog("Debug mode " + (settings.debugMode() ? "on" : "off") + ".");
+        });
         VBox controls = card();
-        controls.getChildren().addAll(tabs, tiers, new HBox(10, refresh, clear), status);
+        controls.getChildren().addAll(tabs, tiers, new HBox(10, refresh, clear, diagnose), status, debugBox, diagnostics);
         content.getChildren().addAll(controls, list,
                 label((adminUnlock ? "Admin account: every cosmetic is unlocked for you. " : "")
                         + "The cosmetics file is shared with the game: " + configFile, 10, MUTED));
@@ -2749,6 +2829,10 @@ public final class LauncherApp extends Application {
             if (status != null) status.setText("Could not save settings: " + e.getMessage());
             showError("Could not save settings", e);
         }
+    }
+
+    private void appendLogLater(String line) {
+        Platform.runLater(() -> appendLog(line));
     }
 
     private void appendLog(String line) {

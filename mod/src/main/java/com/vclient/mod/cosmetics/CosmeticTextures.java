@@ -26,9 +26,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class CosmeticTextures {
     private record Entry(Identifier[] frames, int frameTicks, int width, int height) {}
 
-    private static final Object LOADING = new Object();
+    /** A load in progress; it is declared failed if it is still running after the network timeout. */
+    private record Loading(long startNanos) {}
+
     private static final Object FAILED = new Object();
     private static final Map<String, Object> ENTRIES = new ConcurrentHashMap<>();
+    private static final Map<String, String> FAILURES = new ConcurrentHashMap<>();
     private static final Map<String, Identifier[]> REGISTERED_BY_ID = new ConcurrentHashMap<>();
 
     private CosmeticTextures() {}
@@ -52,11 +55,28 @@ public final class CosmeticTextures {
         return ENTRIES.get(cosmetic.cacheKey()) == FAILED;
     }
 
+    /** Why the texture could not be loaded, for the menu; empty when it did not fail. */
+    public static String failureReason(Cosmetic cosmetic) {
+        return FAILURES.getOrDefault(cosmetic.cacheKey(), "");
+    }
+
+    /** Forgets a failure so the next draw tries again (used by the menu's Refresh button). */
+    public static void retryFailed() {
+        ENTRIES.entrySet().removeIf(entry -> entry.getValue() == FAILED);
+        FAILURES.clear();
+    }
+
     private static Entry entry(Cosmetic cosmetic) {
         String key = cosmetic.cacheKey();
         Object value = ENTRIES.get(key);
         if (value instanceof Entry entry) return entry;
-        if (value == null && ENTRIES.putIfAbsent(key, LOADING) == null) load(cosmetic, key);
+        if (value instanceof Loading loading) {
+            if ((System.nanoTime() - loading.startNanos) / 1_000_000_000L > CosmeticNet.TIMEOUT_SECONDS + 3) {
+                fail(cosmetic, key, "timed out after " + CosmeticNet.TIMEOUT_SECONDS + " seconds");
+            }
+            return null;
+        }
+        if (value == null && ENTRIES.putIfAbsent(key, new Loading(System.nanoTime())) == null) load(cosmetic, key);
         return null;
     }
 
@@ -77,32 +97,42 @@ public final class CosmeticTextures {
                 fail(cosmetic, key, "definition names asset " + assetFile + " but the catalog does not list it");
                 return;
             }
-            CosmeticNet.run(() -> {
-                try {
-                    String base = CosmeticNet.backendUrl();
-                    URI uri = CosmeticNet.resolve(base, asset.url());
-                    String cacheName = (asset.sha256().isEmpty() ? CosmeticNet.safeName(cosmetic.cacheKey()) : asset.sha256())
-                            + "-" + CosmeticNet.safeName(asset.file());
-                    byte[] bytes = CosmeticNet.download(uri, asset.sha256(),
-                            CosmeticNet.directory().resolve("assets").resolve(cacheName)).join();
-                    List<NativeImage> images = new ArrayList<>();
-                    try (NativeImage sheet = NativeImage.read(bytes)) {
-                        int frameHeight = sheet.getHeight() / frames;
-                        for (int frame = 0; frame < frames; frame++) {
-                            NativeImage image = new NativeImage(sheet.getWidth(), frameHeight, true);
-                            for (int y = 0; y < frameHeight; y++) {
-                                for (int x = 0; x < sheet.getWidth(); x++) {
-                                    image.setColorArgb(x, y, sheet.getColorArgb(x, frame * frameHeight + y));
+            URI uri;
+            try {
+                uri = CosmeticNet.resolve(CosmeticNet.backendUrl(), asset.url());
+            } catch (IOException e) {
+                fail(cosmetic, key, e.getMessage());
+                return;
+            }
+            String cacheName = (asset.sha256().isEmpty() ? CosmeticNet.safeName(cosmetic.cacheKey()) : asset.sha256())
+                    + "-" + CosmeticNet.safeName(asset.file());
+            VClientMod.LOGGER.info("[Cosmetics] Loading texture for {} from {}", cosmetic.id(), uri);
+            CosmeticNet.download(uri, asset.sha256(), CosmeticNet.directory().resolve("assets").resolve(cacheName))
+                    .whenComplete((bytes, error) -> {
+                        if (error != null) {
+                            fail(cosmetic, key, CosmeticNet.describe(error));
+                            return;
+                        }
+                        try {
+                            List<NativeImage> images = new ArrayList<>();
+                            try (NativeImage sheet = NativeImage.read(bytes)) {
+                                int frameHeight = sheet.getHeight() / frames;
+                                for (int frame = 0; frame < frames; frame++) {
+                                    NativeImage image = new NativeImage(sheet.getWidth(), frameHeight, true);
+                                    for (int y = 0; y < frameHeight; y++) {
+                                        for (int x = 0; x < sheet.getWidth(); x++) {
+                                            image.setColorArgb(x, y, sheet.getColorArgb(x, frame * frameHeight + y));
+                                        }
+                                    }
+                                    images.add(image);
                                 }
                             }
-                            images.add(image);
+                            register(cosmetic, key, images, frameTicks);
+                        } catch (IOException | RuntimeException e) {
+                            CosmeticNet.logError("Texture image for " + cosmetic.id() + " is not a valid PNG", e);
+                            fail(cosmetic, key, "the downloaded file is not a valid PNG (" + e.getMessage() + ")");
                         }
-                    }
-                    register(cosmetic, key, images, frameTicks);
-                } catch (IOException | RuntimeException e) {
-                    fail(cosmetic, key, String.valueOf(e.getMessage()));
-                }
-            });
+                    });
             return;
         }
         if (spec.get("generator") instanceof JsonObject generator) {
@@ -114,6 +144,7 @@ public final class CosmeticTextures {
                     }
                     register(cosmetic, key, images, frameTicks);
                 } catch (RuntimeException e) {
+                    CosmeticNet.logError("Generating the texture for " + cosmetic.id(), e);
                     fail(cosmetic, key, String.valueOf(e.getMessage()));
                 }
             });
@@ -124,6 +155,7 @@ public final class CosmeticTextures {
 
     private static void fail(Cosmetic cosmetic, String key, String reason) {
         ENTRIES.put(key, FAILED);
+        FAILURES.put(key, reason);
         VClientMod.LOGGER.warn("[Cosmetics] Texture for {} could not be loaded: {}", cosmetic.id(), reason);
     }
 
@@ -131,6 +163,7 @@ public final class CosmeticTextures {
     private static void register(Cosmetic cosmetic, String key, List<NativeImage> images, int frameTicks) {
         MinecraftClient client = MinecraftClient.getInstance();
         client.execute(() -> {
+            try {
             Identifier[] ids = new Identifier[images.size()];
             for (int frame = 0; frame < ids.length; frame++) {
                 ids[frame] = Identifier.of("vclient", "cosmetics/" + cosmetic.id() + "/v" + cosmetic.version() + "/" + frame);
@@ -144,6 +177,10 @@ public final class CosmeticTextures {
             ENTRIES.put(key, new Entry(ids, frameTicks, first.getWidth(), first.getHeight()));
             VClientMod.LOGGER.info("[Cosmetics] Texture ready for {} ({} frame(s), {}x{}).", cosmetic.id(),
                     ids.length, first.getWidth(), first.getHeight());
+            } catch (RuntimeException e) {
+                CosmeticNet.logError("Registering the texture for " + cosmetic.id(), e);
+                fail(cosmetic, key, "could not create the GPU texture (" + e.getMessage() + ")");
+            }
         });
     }
 
