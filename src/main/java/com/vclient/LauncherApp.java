@@ -1898,6 +1898,7 @@ public final class LauncherApp extends Application {
         navigation.setPrefWidth(88);
         navigation.setStyle("-fx-background-color: rgba(9, 10, 27, 0.68); -fx-border-color: transparent rgba(145, 127, 186, 0.18) transparent transparent;");
         for (Page page : Page.values()) {
+            if (page == Page.MODS) continue; // The Mods page stays in the code but has no sidebar button.
             Button item = button(navigationText(page), "transparent", 10);
             item.setMinWidth(76);
             item.setPrefWidth(76);
