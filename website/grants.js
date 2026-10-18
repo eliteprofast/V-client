@@ -2,6 +2,9 @@
 
 // Admin grant tool. The token only lives in memory, so closing the tab signs you out.
 const $ = (id) => document.getElementById(id);
+// The page may be opened from the static site, which has no API, so always talk to the backend.
+const BACKEND = "https://vsmp-client-backend.onrender.com";
+const API = ["localhost", "127.0.0.1"].includes(location.hostname) || location.hostname.includes("vsmp-client-backend") ? "" : BACKEND;
 let token = "";
 let names = {};
 const ADMIN_UUID = "1331c81d33844eb6baf6a511c8298af3";
@@ -13,7 +16,7 @@ function say(text, ok) {
 }
 
 async function call(method, path, body) {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API}/api${path}`, {
     method,
     headers: { "Content-Type": "application/json", Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body ? JSON.stringify(body) : undefined,

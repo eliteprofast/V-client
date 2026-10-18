@@ -35,6 +35,21 @@ function createApp(config, options = {}) {
     next();
   });
 
+  // The static website (a different origin) calls this API, e.g. the grant tool. Tokens travel in a header, not cookies.
+  const allowedOrigins = (process.env.CORS_ORIGINS || 'https://vsmp-client.onrender.com').split(',').map((o) => o.trim());
+  app.use('/api', (req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.set({
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        Vary: 'Origin',
+      });
+    }
+    return req.method === 'OPTIONS' ? res.sendStatus(204) : next();
+  });
+
   // The installer upload route needs a raw body, so JSON parsing is skipped for it.
   app.use((req, res, next) => (req.path.startsWith('/api/admin/releases/') && req.method === 'PUT'
     ? next()
