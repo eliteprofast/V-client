@@ -140,6 +140,10 @@ public final class Cosmetic {
         return (startsAt == 0 || nowSeconds >= startsAt) && (endsAt == 0 || nowSeconds < endsAt);
     }
 
+    public long startsAt() {
+        return startsAt;
+    }
+
     public long endsAt() {
         return endsAt;
     }

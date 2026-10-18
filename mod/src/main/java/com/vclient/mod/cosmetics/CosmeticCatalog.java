@@ -285,6 +285,10 @@ public final class CosmeticCatalog {
     /** Short reason shown on locked cards. */
     public static String lockReason(Cosmetic cosmetic) {
         long now = System.currentTimeMillis() / 1000;
+        if (cosmetic.startsAt() > now) {
+            return "Starts " + java.time.LocalDate.ofEpochDay(cosmetic.startsAt() / 86400).format(
+                    java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale.ENGLISH));
+        }
         if (!cosmetic.windowOpen(now) && cosmetic.tier() != CosmeticTier.PREMIUM) return "Event ended";
         return cosmetic.tier() == CosmeticTier.PREMIUM ? "Premium" : "Locked";
     }

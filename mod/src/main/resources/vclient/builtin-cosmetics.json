@@ -1610,6 +1610,2948 @@
           ]
         }
       }
+    },
+    {
+      "id": "launch_cape",
+      "category": "cape",
+      "tier": "event",
+      "name": "Launch Day",
+      "sort": 100,
+      "description": "The VSMP V-Client launch cape. Event: 10 November.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#0b1030",
+              "#6b3fa0",
+              "#E6BD59"
+            ]
+          }
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "launch_gold",
+      "category": "cape",
+      "tier": "event",
+      "name": "Launch Gold",
+      "sort": 101,
+      "description": "Gold stripes for launch day. Event: 10 November.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "generator": {
+            "type": "stripes",
+            "colors": [
+              "#E6BD59",
+              "#0b1030"
+            ],
+            "size": 2
+          }
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "sunset_cape",
+      "category": "cape",
+      "tier": "free",
+      "name": "Sunset",
+      "sort": 102,
+      "description": "Orange to purple evening sky.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#ff9a3c",
+              "#e0446a",
+              "#4a1d7a"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ocean_cape",
+      "category": "cape",
+      "tier": "free",
+      "name": "Ocean",
+      "sort": 103,
+      "description": "Deep blue to aqua.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#04215a",
+              "#0a6fb5",
+              "#4fd8e0"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "lava_cape",
+      "category": "cape",
+      "tier": "premium",
+      "name": "Lava",
+      "sort": 104,
+      "description": "Molten red and black.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#1a0000",
+              "#b3150f",
+              "#ffb000"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ice_cape",
+      "category": "cape",
+      "tier": "premium",
+      "name": "Frost",
+      "sort": 105,
+      "description": "Icy white and blue.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#ffffff",
+              "#9fd8ff",
+              "#2a6bd1"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "rose_cape",
+      "category": "cape",
+      "tier": "free",
+      "name": "Rose",
+      "sort": 106,
+      "description": "Pink to deep rose.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#ffc2d9",
+              "#e0407a",
+              "#7a0f3a"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "checker_cape",
+      "category": "cape",
+      "tier": "free",
+      "name": "Checkerboard",
+      "sort": 107,
+      "description": "Black and white checks.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "generator": {
+            "type": "checker",
+            "colors": [
+              "#f2f2f2",
+              "#161616"
+            ],
+            "size": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "neon_cape",
+      "category": "cape",
+      "tier": "premium",
+      "name": "Neon Grid",
+      "sort": 108,
+      "description": "Magenta and cyan stripes.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "generator": {
+            "type": "stripes",
+            "colors": [
+              "#ff2bd6",
+              "#10e0ff"
+            ],
+            "size": 3
+          }
+        }
+      }
+    },
+    {
+      "id": "void_cape",
+      "category": "cape",
+      "tier": "event",
+      "name": "Void",
+      "sort": 109,
+      "description": "Black fading to violet. Event: 10 November.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#000000",
+              "#1b0a33",
+              "#7b2cff"
+            ]
+          }
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "launch_shimmer",
+      "category": "animated",
+      "tier": "event",
+      "name": "Launch Shimmer",
+      "sort": 110,
+      "description": "A gold wave sweeping over midnight. Event: 10 November.",
+      "definition": {
+        "slot": "cape",
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "frames": 24,
+          "frameTicks": 2,
+          "generator": {
+            "type": "shimmer",
+            "colors": [
+              "#0b1030",
+              "#ffd86b"
+            ],
+            "direction": "vertical"
+          }
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "lava_flow",
+      "category": "animated",
+      "tier": "premium",
+      "name": "Lava Flow",
+      "sort": 111,
+      "description": "Glowing lava surging down the cape.",
+      "definition": {
+        "slot": "cape",
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "frames": 24,
+          "frameTicks": 2,
+          "generator": {
+            "type": "shimmer",
+            "colors": [
+              "#2a0000",
+              "#ff7a00"
+            ],
+            "direction": "vertical"
+          }
+        }
+      }
+    },
+    {
+      "id": "ice_flow",
+      "category": "animated",
+      "tier": "free",
+      "name": "Frost Wave",
+      "sort": 112,
+      "description": "A cold wave rolling over ice.",
+      "definition": {
+        "slot": "cape",
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "frames": 24,
+          "frameTicks": 3,
+          "generator": {
+            "type": "shimmer",
+            "colors": [
+              "#1a4a8a",
+              "#d8f4ff"
+            ],
+            "direction": "vertical"
+          }
+        }
+      }
+    },
+    {
+      "id": "neon_pulse",
+      "category": "animated",
+      "tier": "premium",
+      "name": "Neon Pulse",
+      "sort": 113,
+      "description": "Cyan light racing over magenta.",
+      "definition": {
+        "slot": "cape",
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "frames": 24,
+          "frameTicks": 2,
+          "generator": {
+            "type": "shimmer",
+            "colors": [
+              "#7a0a6a",
+              "#18f0ff"
+            ],
+            "direction": "vertical"
+          }
+        }
+      }
+    },
+    {
+      "id": "emerald_wave",
+      "category": "animated",
+      "tier": "free",
+      "name": "Emerald Wave",
+      "sort": 114,
+      "description": "Green light flowing down the cape.",
+      "definition": {
+        "slot": "cape",
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "frames": 24,
+          "frameTicks": 3,
+          "generator": {
+            "type": "shimmer",
+            "colors": [
+              "#06361f",
+              "#5dffa6"
+            ],
+            "direction": "vertical"
+          }
+        }
+      }
+    },
+    {
+      "id": "royal_wave",
+      "category": "animated",
+      "tier": "event",
+      "name": "Royal Wave",
+      "sort": 115,
+      "description": "Purple and gold ripple. Event: 10 November.",
+      "definition": {
+        "slot": "cape",
+        "texture": {
+          "width": 64,
+          "height": 32,
+          "frames": 24,
+          "frameTicks": 2,
+          "generator": {
+            "type": "shimmer",
+            "colors": [
+              "#2a0d55",
+              "#E6BD59"
+            ],
+            "direction": "vertical"
+          }
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "phoenix_wings",
+      "category": "wings",
+      "tier": "premium",
+      "name": "Phoenix Wings",
+      "sort": 116,
+      "description": "Fiery wings that beat fast.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#ffdf5a",
+              "#ff6a00",
+              "#a30000"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "body",
+              "pivot": [
+                2.5,
+                1,
+                2.4
+              ],
+              "rotation": [
+                0,
+                -25,
+                0
+              ],
+              "mirror": true,
+              "cuboids": [
+                {
+                  "origin": [
+                    0,
+                    -1,
+                    0
+                  ],
+                  "size": [
+                    12,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    2,
+                    0
+                  ],
+                  "size": [
+                    15,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    5,
+                    0
+                  ],
+                  "size": [
+                    14,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    8,
+                    0
+                  ],
+                  "size": [
+                    11,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    11,
+                    0
+                  ],
+                  "size": [
+                    8,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    14,
+                    0
+                  ],
+                  "size": [
+                    5,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "rotation",
+                "mode": "sine",
+                "speed": 0.9,
+                "amplitude": 22
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "crystal_wings",
+      "category": "wings",
+      "tier": "premium",
+      "name": "Crystal Wings",
+      "sort": 117,
+      "description": "Icy crystal shards.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#e8fbff",
+              "#7fd6ff",
+              "#3a7bff"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "body",
+              "pivot": [
+                2.5,
+                1,
+                2.4
+              ],
+              "rotation": [
+                0,
+                -25,
+                0
+              ],
+              "mirror": true,
+              "cuboids": [
+                {
+                  "origin": [
+                    0,
+                    -1,
+                    0
+                  ],
+                  "size": [
+                    6,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    2,
+                    0
+                  ],
+                  "size": [
+                    10,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    5,
+                    0
+                  ],
+                  "size": [
+                    14,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    8,
+                    0
+                  ],
+                  "size": [
+                    12,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    11,
+                    0
+                  ],
+                  "size": [
+                    8,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "rotation",
+                "mode": "sine",
+                "speed": 0.5,
+                "amplitude": 14
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bat_wings",
+      "category": "wings",
+      "tier": "free",
+      "name": "Bat Wings",
+      "sort": 118,
+      "description": "Dark leathery bat wings.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#1a1020",
+              "#3b2150"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "body",
+              "pivot": [
+                2.5,
+                1,
+                2.4
+              ],
+              "rotation": [
+                0,
+                -35,
+                0
+              ],
+              "mirror": true,
+              "cuboids": [
+                {
+                  "origin": [
+                    0,
+                    -1,
+                    0
+                  ],
+                  "size": [
+                    16,
+                    2,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    2,
+                    0
+                  ],
+                  "size": [
+                    14,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    5,
+                    0
+                  ],
+                  "size": [
+                    12,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    8,
+                    0
+                  ],
+                  "size": [
+                    8,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    11,
+                    0
+                  ],
+                  "size": [
+                    5,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "rotation",
+                "mode": "sine",
+                "speed": 0.8,
+                "amplitude": 20
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "butterfly_wings",
+      "category": "wings",
+      "tier": "free",
+      "name": "Butterfly Wings",
+      "sort": 119,
+      "description": "Pink and blue butterfly wings.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#ff9ad5",
+              "#9a7bff",
+              "#5ad8ff"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "body",
+              "pivot": [
+                2.5,
+                1,
+                2.4
+              ],
+              "rotation": [
+                0,
+                -25,
+                0
+              ],
+              "mirror": true,
+              "cuboids": [
+                {
+                  "origin": [
+                    0,
+                    -1,
+                    0
+                  ],
+                  "size": [
+                    10,
+                    4,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    2,
+                    0
+                  ],
+                  "size": [
+                    14,
+                    4,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    5,
+                    0
+                  ],
+                  "size": [
+                    12,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    8,
+                    0
+                  ],
+                  "size": [
+                    8,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "rotation",
+                "mode": "sine",
+                "speed": 0.7,
+                "amplitude": 16
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "launch_wings",
+      "category": "wings",
+      "tier": "event",
+      "name": "Launch Wings",
+      "sort": 120,
+      "description": "Golden launch-day wings. Event: 10 November.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#fff1a8",
+              "#E6BD59",
+              "#a8761a"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "body",
+              "pivot": [
+                2.5,
+                1,
+                2.4
+              ],
+              "rotation": [
+                0,
+                -25,
+                0
+              ],
+              "mirror": true,
+              "cuboids": [
+                {
+                  "origin": [
+                    0,
+                    -1,
+                    0
+                  ],
+                  "size": [
+                    13,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    2,
+                    0
+                  ],
+                  "size": [
+                    16,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    5,
+                    0
+                  ],
+                  "size": [
+                    15,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    8,
+                    0
+                  ],
+                  "size": [
+                    12,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    11,
+                    0
+                  ],
+                  "size": [
+                    9,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    14,
+                    0
+                  ],
+                  "size": [
+                    6,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "rotation",
+                "mode": "sine",
+                "speed": 0.6,
+                "amplitude": 18
+              }
+            }
+          ]
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "void_wings",
+      "category": "wings",
+      "tier": "event",
+      "name": "Void Wings",
+      "sort": 121,
+      "description": "Violet wings from the void. Event: 10 November.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#000000",
+              "#3a0f8a",
+              "#b07bff"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "body",
+              "pivot": [
+                2.5,
+                1,
+                2.4
+              ],
+              "rotation": [
+                0,
+                -25,
+                0
+              ],
+              "mirror": true,
+              "cuboids": [
+                {
+                  "origin": [
+                    0,
+                    -1,
+                    0
+                  ],
+                  "size": [
+                    14,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    2,
+                    0
+                  ],
+                  "size": [
+                    16,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    5,
+                    0
+                  ],
+                  "size": [
+                    13,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    8,
+                    0
+                  ],
+                  "size": [
+                    10,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    11,
+                    0
+                  ],
+                  "size": [
+                    7,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "rotation",
+                "mode": "sine",
+                "speed": 0.5,
+                "amplitude": 16
+              }
+            }
+          ]
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "robot_wings",
+      "category": "wings",
+      "tier": "premium",
+      "name": "Robo Wings",
+      "sort": 122,
+      "description": "Chunky metal wings.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#d0d6dc",
+              "#7d8790",
+              "#2b3138"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "body",
+              "pivot": [
+                2.5,
+                1,
+                2.4
+              ],
+              "rotation": [
+                0,
+                -25,
+                0
+              ],
+              "mirror": true,
+              "cuboids": [
+                {
+                  "origin": [
+                    0,
+                    -1,
+                    0
+                  ],
+                  "size": [
+                    10,
+                    4,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    2,
+                    0
+                  ],
+                  "size": [
+                    12,
+                    4,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    5,
+                    0
+                  ],
+                  "size": [
+                    10,
+                    4,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "rotation",
+                "mode": "sine",
+                "speed": 0.4,
+                "amplitude": 8
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rainbow_wings",
+      "category": "wings",
+      "tier": "premium",
+      "name": "Rainbow Wings",
+      "sort": 123,
+      "description": "Seven bands of color.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#ff3b3b",
+              "#ffb13b",
+              "#fff23b",
+              "#3bff6a",
+              "#3b9bff",
+              "#8a3bff"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "body",
+              "pivot": [
+                2.5,
+                1,
+                2.4
+              ],
+              "rotation": [
+                0,
+                -25,
+                0
+              ],
+              "mirror": true,
+              "cuboids": [
+                {
+                  "origin": [
+                    0,
+                    -1,
+                    0
+                  ],
+                  "size": [
+                    14,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    2,
+                    0
+                  ],
+                  "size": [
+                    15,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    5,
+                    0
+                  ],
+                  "size": [
+                    14,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    8,
+                    0
+                  ],
+                  "size": [
+                    12,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    11,
+                    0
+                  ],
+                  "size": [
+                    9,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    0,
+                    14,
+                    0
+                  ],
+                  "size": [
+                    6,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "rotation",
+                "mode": "sine",
+                "speed": 0.6,
+                "amplitude": 18
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "party_hat",
+      "category": "hat",
+      "tier": "free",
+      "name": "Party Hat",
+      "sort": 124,
+      "description": "Cone-shaped party hat.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#ff5ac8",
+              "#ffe45a"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "head",
+              "pivot": [
+                0,
+                0,
+                0
+              ],
+              "cuboids": [
+                {
+                  "origin": [
+                    -3,
+                    -10,
+                    -3
+                  ],
+                  "size": [
+                    6,
+                    2,
+                    6
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -2,
+                    -12,
+                    -2
+                  ],
+                  "size": [
+                    4,
+                    2,
+                    4
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -1,
+                    -14,
+                    -1
+                  ],
+                  "size": [
+                    2,
+                    2,
+                    2
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -0.5,
+                    -15,
+                    -0.5
+                  ],
+                  "size": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "launch_hat",
+      "category": "hat",
+      "tier": "event",
+      "name": "Launch Crown",
+      "sort": 125,
+      "description": "A gleaming crown for the launch. Event: 10 November.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#fff1a8",
+              "#E6BD59"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "head",
+              "pivot": [
+                0,
+                0,
+                0
+              ],
+              "cuboids": [
+                {
+                  "origin": [
+                    -5,
+                    -10,
+                    -5
+                  ],
+                  "size": [
+                    10,
+                    2,
+                    10
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -5,
+                    -14,
+                    -5
+                  ],
+                  "size": [
+                    2,
+                    4,
+                    2
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    3,
+                    -14,
+                    -5
+                  ],
+                  "size": [
+                    2,
+                    4,
+                    2
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -5,
+                    -14,
+                    3
+                  ],
+                  "size": [
+                    2,
+                    4,
+                    2
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    3,
+                    -14,
+                    3
+                  ],
+                  "size": [
+                    2,
+                    4,
+                    2
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -1,
+                    -16,
+                    -1
+                  ],
+                  "size": [
+                    2,
+                    6,
+                    2
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "rotation",
+                "mode": "spin",
+                "speed": 0.15
+              }
+            }
+          ]
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "horns",
+      "category": "hat",
+      "tier": "free",
+      "name": "Devil Horns",
+      "sort": 126,
+      "description": "Two little red horns.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#6a0000",
+              "#e01818"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "head",
+              "pivot": [
+                0,
+                0,
+                0
+              ],
+              "cuboids": [
+                {
+                  "origin": [
+                    -4,
+                    -11,
+                    -1
+                  ],
+                  "size": [
+                    1,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    3,
+                    -11,
+                    -1
+                  ],
+                  "size": [
+                    1,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -4,
+                    -12,
+                    -1
+                  ],
+                  "size": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    3,
+                    -12,
+                    -1
+                  ],
+                  "size": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bunny_ears",
+      "category": "hat",
+      "tier": "free",
+      "name": "Bunny Ears",
+      "sort": 127,
+      "description": "Long floppy ears.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#ffffff",
+              "#ffb6d5"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "head",
+              "pivot": [
+                0,
+                0,
+                0
+              ],
+              "cuboids": [
+                {
+                  "origin": [
+                    -3,
+                    -16,
+                    -1
+                  ],
+                  "size": [
+                    2,
+                    8,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    1,
+                    -16,
+                    -1
+                  ],
+                  "size": [
+                    2,
+                    8,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "x",
+                "target": "rotation",
+                "mode": "sine",
+                "speed": 0.5,
+                "amplitude": 6
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fez",
+      "category": "hat",
+      "tier": "free",
+      "name": "Fez",
+      "sort": 128,
+      "description": "A red fez with a tassel.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#c01818",
+              "#7a0a0a"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "head",
+              "pivot": [
+                0,
+                0,
+                0
+              ],
+              "cuboids": [
+                {
+                  "origin": [
+                    -3,
+                    -12,
+                    -3
+                  ],
+                  "size": [
+                    6,
+                    4,
+                    6
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -0.5,
+                    -12.5,
+                    -0.5
+                  ],
+                  "size": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    2.5,
+                    -12,
+                    2.5
+                  ],
+                  "size": [
+                    1,
+                    3,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "star_topper",
+      "category": "hat",
+      "tier": "premium",
+      "name": "Star Topper",
+      "sort": 129,
+      "description": "A spinning gold star above you.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#fff6b0",
+              "#ffcc00"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "head",
+              "pivot": [
+                0,
+                0,
+                0
+              ],
+              "cuboids": [
+                {
+                  "origin": [
+                    -1,
+                    -16,
+                    -1
+                  ],
+                  "size": [
+                    2,
+                    2,
+                    2
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -3,
+                    -15,
+                    -0.5
+                  ],
+                  "size": [
+                    6,
+                    1,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -0.5,
+                    -17,
+                    -0.5
+                  ],
+                  "size": [
+                    1,
+                    5,
+                    1
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "rotation",
+                "mode": "spin",
+                "speed": 0.5
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "lantern_hat",
+      "category": "hat",
+      "tier": "event",
+      "name": "Lantern",
+      "sort": 130,
+      "description": "A lantern floating above your head. Event: 10 November.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#ffe28a",
+              "#ff9a1f"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "head",
+              "pivot": [
+                0,
+                0,
+                0
+              ],
+              "cuboids": [
+                {
+                  "origin": [
+                    -2,
+                    -14,
+                    -2
+                  ],
+                  "size": [
+                    4,
+                    4,
+                    4
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -1,
+                    -15,
+                    -1
+                  ],
+                  "size": [
+                    2,
+                    1,
+                    2
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -1,
+                    -10,
+                    -1
+                  ],
+                  "size": [
+                    2,
+                    2,
+                    2
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "anim": {
+                "axis": "y",
+                "target": "position",
+                "mode": "bob",
+                "speed": 0.5,
+                "amplitude": 1.5
+              }
+            }
+          ]
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "archmage_hat",
+      "category": "hat",
+      "tier": "premium",
+      "name": "Archmage Hat",
+      "sort": 131,
+      "description": "Tall purple hat with a wide brim.",
+      "definition": {
+        "texture": {
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "type": "gradient",
+            "colors": [
+              "#2a0d55",
+              "#6b3fa0"
+            ]
+          }
+        },
+        "model": {
+          "parts": [
+            {
+              "bone": "head",
+              "pivot": [
+                0,
+                0,
+                0
+              ],
+              "cuboids": [
+                {
+                  "origin": [
+                    -6,
+                    -9,
+                    -6
+                  ],
+                  "size": [
+                    12,
+                    1,
+                    12
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -3,
+                    -12,
+                    -3
+                  ],
+                  "size": [
+                    6,
+                    3,
+                    6
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -2,
+                    -15,
+                    -2
+                  ],
+                  "size": [
+                    4,
+                    3,
+                    4
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "origin": [
+                    -1,
+                    -18,
+                    -1
+                  ],
+                  "size": [
+                    2,
+                    3,
+                    2
+                  ],
+                  "uv": [
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "firework_trail",
+      "category": "trail",
+      "tier": "event",
+      "name": "Fireworks",
+      "sort": 132,
+      "description": "Bursts of fireworks follow you. Event: 10 November.",
+      "definition": {
+        "trail": {
+          "particle": "minecraft:firework",
+          "rate": 2,
+          "count": 1,
+          "spread": [
+            0.4,
+            0.9,
+            0.4
+          ],
+          "offset": [
+            0,
+            0.2,
+            0
+          ],
+          "velocity": [
+            0,
+            0.02,
+            0
+          ]
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "flame_trail",
+      "category": "trail",
+      "tier": "free",
+      "name": "Flames",
+      "sort": 133,
+      "description": "A line of fire.",
+      "definition": {
+        "trail": {
+          "particle": "minecraft:flame",
+          "rate": 2,
+          "count": 1,
+          "spread": [
+            0.3,
+            0.6,
+            0.3
+          ],
+          "offset": [
+            0,
+            0.2,
+            0
+          ],
+          "velocity": [
+            0,
+            0.01,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "id": "music_trail",
+      "category": "trail",
+      "tier": "free",
+      "name": "Music Notes",
+      "sort": 134,
+      "description": "Notes float up behind you.",
+      "definition": {
+        "trail": {
+          "particle": "minecraft:note",
+          "rate": 6,
+          "count": 1,
+          "spread": [
+            0.4,
+            0.8,
+            0.4
+          ],
+          "offset": [
+            0,
+            0.2,
+            0
+          ],
+          "velocity": [
+            0,
+            0.02,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "id": "enchant_trail",
+      "category": "trail",
+      "tier": "premium",
+      "name": "Enchanted",
+      "sort": 135,
+      "description": "Glyphs swirl around you.",
+      "definition": {
+        "trail": {
+          "particle": "minecraft:enchant",
+          "rate": 1,
+          "count": 3,
+          "spread": [
+            0.5,
+            1,
+            0.5
+          ],
+          "offset": [
+            0,
+            0.2,
+            0
+          ],
+          "velocity": [
+            0,
+            0.05,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "id": "cloud_trail",
+      "category": "trail",
+      "tier": "free",
+      "name": "Clouds",
+      "sort": 136,
+      "description": "Puffs of cloud.",
+      "definition": {
+        "trail": {
+          "particle": "minecraft:cloud",
+          "rate": 3,
+          "count": 1,
+          "spread": [
+            0.3,
+            0.2,
+            0.3
+          ],
+          "offset": [
+            0,
+            0.2,
+            0
+          ],
+          "velocity": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "id": "totem_trail",
+      "category": "trail",
+      "tier": "premium",
+      "name": "Totem Burst",
+      "sort": 137,
+      "description": "Green totem particles.",
+      "definition": {
+        "trail": {
+          "particle": "minecraft:totem_of_undying",
+          "rate": 4,
+          "count": 1,
+          "spread": [
+            0.4,
+            0.9,
+            0.4
+          ],
+          "offset": [
+            0,
+            0.2,
+            0
+          ],
+          "velocity": [
+            0,
+            0.05,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "id": "dragon_trail",
+      "category": "trail",
+      "tier": "event",
+      "name": "Portal Swirl",
+      "sort": 138,
+      "description": "Violet portal swirl. Event: 10 November.",
+      "definition": {
+        "trail": {
+          "particle": "minecraft:portal",
+          "rate": 2,
+          "count": 1,
+          "spread": [
+            0.3,
+            0.4,
+            0.3
+          ],
+          "offset": [
+            0,
+            0.2,
+            0
+          ],
+          "velocity": [
+            0,
+            0.01,
+            0
+          ]
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "cheer",
+      "category": "emote",
+      "tier": "free",
+      "name": "Cheer",
+      "sort": 139,
+      "description": "Both arms up.",
+      "definition": {
+        "emote": {
+          "duration": 40,
+          "loop": false,
+          "cancelOnMove": true,
+          "tracks": [
+            {
+              "part": "rightArm",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  8,
+                  -170
+                ],
+                [
+                  32,
+                  -170
+                ],
+                [
+                  40,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "leftArm",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  8,
+                  -170
+                ],
+                [
+                  32,
+                  -170
+                ],
+                [
+                  40,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "rightArm",
+              "axis": "z",
+              "ease": "smooth",
+              "keys": [
+                [
+                  8,
+                  0
+                ],
+                [
+                  14,
+                  15
+                ],
+                [
+                  20,
+                  -5
+                ],
+                [
+                  26,
+                  15
+                ],
+                [
+                  32,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "leftArm",
+              "axis": "z",
+              "ease": "smooth",
+              "keys": [
+                [
+                  8,
+                  0
+                ],
+                [
+                  14,
+                  -15
+                ],
+                [
+                  20,
+                  5
+                ],
+                [
+                  26,
+                  -15
+                ],
+                [
+                  32,
+                  0
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bow",
+      "category": "emote",
+      "tier": "free",
+      "name": "Bow",
+      "sort": 140,
+      "description": "A polite bow.",
+      "definition": {
+        "emote": {
+          "duration": 36,
+          "loop": false,
+          "cancelOnMove": true,
+          "tracks": [
+            {
+              "part": "body",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  12,
+                  45
+                ],
+                [
+                  24,
+                  45
+                ],
+                [
+                  36,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "head",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  12,
+                  20
+                ],
+                [
+                  24,
+                  20
+                ],
+                [
+                  36,
+                  0
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "flex",
+      "category": "emote",
+      "tier": "free",
+      "name": "Flex",
+      "sort": 141,
+      "description": "Show off.",
+      "definition": {
+        "emote": {
+          "duration": 44,
+          "loop": false,
+          "cancelOnMove": true,
+          "tracks": [
+            {
+              "part": "rightArm",
+              "axis": "z",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  8,
+                  -90
+                ],
+                [
+                  36,
+                  -90
+                ],
+                [
+                  44,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "leftArm",
+              "axis": "z",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  8,
+                  90
+                ],
+                [
+                  36,
+                  90
+                ],
+                [
+                  44,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "rightArm",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  8,
+                  0
+                ],
+                [
+                  14,
+                  -60
+                ],
+                [
+                  20,
+                  0
+                ],
+                [
+                  26,
+                  -60
+                ],
+                [
+                  32,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "leftArm",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  8,
+                  0
+                ],
+                [
+                  14,
+                  -60
+                ],
+                [
+                  20,
+                  0
+                ],
+                [
+                  26,
+                  -60
+                ],
+                [
+                  32,
+                  0
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "spin_emote",
+      "category": "emote",
+      "tier": "premium",
+      "name": "Spin",
+      "sort": 142,
+      "description": "Twirl on the spot.",
+      "definition": {
+        "emote": {
+          "duration": 30,
+          "loop": true,
+          "cancelOnMove": true,
+          "tracks": [
+            {
+              "part": "body",
+              "axis": "y",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  30,
+                  360
+                ]
+              ]
+            },
+            {
+              "part": "rightArm",
+              "axis": "z",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  60
+                ],
+                [
+                  30,
+                  60
+                ]
+              ]
+            },
+            {
+              "part": "leftArm",
+              "axis": "z",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  -60
+                ],
+                [
+                  30,
+                  -60
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "launch_celebrate",
+      "category": "emote",
+      "tier": "event",
+      "name": "Launch Celebration",
+      "sort": 143,
+      "description": "Jump and cheer for the launch. Event: 10 November.",
+      "definition": {
+        "emote": {
+          "duration": 48,
+          "loop": false,
+          "cancelOnMove": true,
+          "tracks": [
+            {
+              "part": "rightArm",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  6,
+                  -170
+                ],
+                [
+                  42,
+                  -170
+                ],
+                [
+                  48,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "leftArm",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  6,
+                  -170
+                ],
+                [
+                  42,
+                  -170
+                ],
+                [
+                  48,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "rightLeg",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  6,
+                  0
+                ],
+                [
+                  12,
+                  -30
+                ],
+                [
+                  18,
+                  0
+                ],
+                [
+                  24,
+                  -30
+                ],
+                [
+                  30,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "leftLeg",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  6,
+                  0
+                ],
+                [
+                  12,
+                  30
+                ],
+                [
+                  18,
+                  0
+                ],
+                [
+                  24,
+                  30
+                ],
+                [
+                  30,
+                  0
+                ]
+              ]
+            },
+            {
+              "part": "head",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  10,
+                  -20
+                ],
+                [
+                  36,
+                  -20
+                ],
+                [
+                  48,
+                  0
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "startsAt": 1794268800
+    },
+    {
+      "id": "sit_emote",
+      "category": "emote",
+      "tier": "free",
+      "name": "Sit",
+      "sort": 144,
+      "description": "Sit down for a bit.",
+      "definition": {
+        "emote": {
+          "duration": 40,
+          "loop": true,
+          "cancelOnMove": true,
+          "tracks": [
+            {
+              "part": "rightLeg",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  -85
+                ],
+                [
+                  40,
+                  -85
+                ]
+              ]
+            },
+            {
+              "part": "leftLeg",
+              "axis": "x",
+              "ease": "smooth",
+              "keys": [
+                [
+                  0,
+                  -85
+                ],
+                [
+                  40,
+                  -85
+                ]
+              ]
+            }
+          ]
+        }
+      }
     }
   ]
 }

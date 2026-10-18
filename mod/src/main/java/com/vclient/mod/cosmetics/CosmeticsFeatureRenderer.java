@@ -46,7 +46,6 @@ public final class CosmeticsFeatureRenderer extends FeatureRenderer<PlayerEntity
 
     private static void drawBone(ModelPart bone, ModelPart root, Identifier texture, MatrixStack matrices,
                                  OrderedRenderCommandQueue queue, int light) {
-        if (root.isEmpty()) return;
         matrices.push();
         bone.applyTransform(matrices);
         queue.submitModelPart(root, matrices, RenderLayers.entityCutoutNoCull(texture), light,
