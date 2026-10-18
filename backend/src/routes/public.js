@@ -1,4 +1,5 @@
 'use strict';
+const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const { compareVersions } = require('./../security');
@@ -34,6 +35,25 @@ function latestRelease(db, platform) {
     'SELECT * FROM releases WHERE platform = ? AND published = 1 AND file_name IS NOT NULL',
   ).all(platform);
   return rows.sort((a, b) => compareVersions(b.version, a.version))[0] || null;
+}
+
+/**
+ * Windows release described by website/update.json, which the installer build writes next to the installer.
+ * It is part of the deployed site, so it survives restarts on hosts without a disk. Uploaded releases win.
+ */
+function fileRelease(config, platform) {
+  if (platform !== 'windows') return null;
+  try {
+    const info = JSON.parse(fs.readFileSync(path.join(config.websiteDir, 'update.json'), 'utf8'));
+    if (!info.version || !info.url) return null;
+    return {
+      id: 0, platform, version: String(info.version), notes: String(info.notes || ''), mandatory: !!info.mandatory,
+      minSupported: String(info.minSupported || '0.0.0'), size: Number(info.size) || 0, sha256: String(info.sha256 || ''),
+      url: String(info.url), publishedAt: String(info.publishedAt || ''),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function publicRoutes(ctx) {
@@ -94,8 +114,15 @@ function publicRoutes(ctx) {
     const platform = String(req.query.platform || '').toLowerCase();
     if (!PLATFORMS.includes(platform)) return res.status(400).json({ error: 'platform must be windows or android' });
     const current = String(req.query.current || '0.0.0').slice(0, 32);
-    const latest = latestRelease(db, platform);
-    if (!latest) return res.json({ updateAvailable: false, mandatory: false, current, latest: null });
+    const uploaded = latestRelease(db, platform);
+    if (!uploaded) {
+      const fromFile = fileRelease(config, platform);
+      if (!fromFile) return res.json({ updateAvailable: false, mandatory: false, current, latest: null });
+      const available = compareVersions(fromFile.version, current) > 0;
+      const required = available && (fromFile.mandatory || compareVersions(current, fromFile.minSupported) < 0);
+      return res.json({ updateAvailable: available, mandatory: required, current, latest: fromFile });
+    }
+    const latest = uploaded;
     const updateAvailable = compareVersions(latest.version, current) > 0;
     const mandatory = updateAvailable && (!!latest.mandatory || compareVersions(current, latest.min_supported) < 0);
     return res.json({ updateAvailable, mandatory, current, latest: releaseView(latest) });

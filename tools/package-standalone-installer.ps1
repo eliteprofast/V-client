@@ -34,4 +34,21 @@ if ($verification.ExitCode -ne 0) {
     throw "The generated setup executable failed its embedded bundle verification."
 }
 
-Write-Host "Standalone installer ready: $output"
+# Tell running launchers a new version exists: the backend serves this file at /api/launcher/update.
+$appInfo = Get-Content -Raw (Join-Path $repoRoot "src/main/java/com/vclient/AppInfo.java")
+$version = [regex]::Match($appInfo, 'VERSION = "([^"]+)"').Groups[1].Value
+$notes = if ($env:RELEASE_NOTES) { $env:RELEASE_NOTES } else { "Bug fixes and improvements." }
+$update = [ordered]@{
+    version      = $version
+    url          = "/VSMPClientSetup.exe"
+    sha256       = (Get-FileHash -Algorithm SHA256 $output).Hash.ToLowerInvariant()
+    size         = (Get-Item $output).Length
+    notes        = $notes
+    mandatory    = $false
+    minSupported = "0.0.0"
+    publishedAt  = (Get-Date).ToUniversalTime().ToString("o")
+}
+$updateJson = ($update | ConvertTo-Json) + [Environment]::NewLine
+[System.IO.File]::WriteAllText((Join-Path $repoRoot "website/update.json"), $updateJson, (New-Object System.Text.UTF8Encoding($false)))
+
+Write-Host "Standalone installer ready: $output ($version)"

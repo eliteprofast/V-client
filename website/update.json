@@ -1,0 +1,10 @@
+{
+    "version":  "1.3.0",
+    "url":  "/VSMPClientSetup.exe",
+    "sha256":  "c7d0b9d84287fda20756d7827200755135b14b1c4f72663f196303715ba6be97",
+    "size":  63076352,
+    "notes":  "Cosmetics are now locked (1 free per tab), invite rewards, new launch-event cosmetics, wings and hats fixed, Start menu shortcut.",
+    "mandatory":  false,
+    "minSupported":  "0.0.0",
+    "publishedAt":  "2026-10-18T16:05:30.1628887Z"
+}
