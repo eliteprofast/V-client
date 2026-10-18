@@ -280,8 +280,13 @@ final class BackendClient {
             try {
                 root = response.body().isBlank() ? JSON.createObjectNode() : JSON.readTree(response.body());
             } catch (IOException e) {
-                throw new IOException("The backend returned something that is not JSON (HTTP " + response.statusCode()
-                        + ", " + response.headers().firstValue("Content-Type").orElse("no content type") + "). "
+                String type = response.headers().firstValue("Content-Type").orElse("no content type");
+                boolean plainNotFound = response.statusCode() == 404 && type.startsWith("text/plain");
+                throw new IOException(plainNotFound
+                        ? "This address answers /api requests with a plain \"Not Found\" (HTTP 404), so it is not running the "
+                        + "V-Client backend. It is probably the website's static hosting. Point the launcher at the Node backend "
+                        + "service instead (see backend/README.md and render.yaml)."
+                        : "The backend returned something that is not JSON (HTTP " + response.statusCode() + ", " + type + "). "
                         + "Check the backend address; a free host may still be waking up.", e);
             }
             if (response.statusCode() >= 400) {
