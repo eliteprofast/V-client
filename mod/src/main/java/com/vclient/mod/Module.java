@@ -81,7 +81,19 @@ public enum Module {
     FAST_BREAK("Fast Break", "No delay between breaking blocks", false, Kind.CHEAT),
     TIME_CHANGER("Time Changer", "Pick the time of day you see", false, Kind.CHEAT,
             Setting.choice("time", "Time", 1, "Day", "Noon", "Sunset", "Night", "Midnight", "Sunrise")),
-    AUTO_WALK("Auto Walk", "Keep walking forward", false, Kind.CHEAT);
+    AUTO_WALK("Auto Walk", "Keep walking forward", false, Kind.CHEAT),
+    BUNNY_HOP("Bunny Hop", "Jump automatically while running", false, Kind.CHEAT),
+    LONG_JUMP("Long Jump", "Jump much further forward", false, Kind.CHEAT,
+            Setting.number("boost", "Distance", 1.8, 1.2, 4, 0.2, "x")),
+    FAST_CLIMB("Fast Climb", "Climb ladders and vines faster", false, Kind.CHEAT,
+            Setting.number("speed", "Climb speed", 0.4, 0.2, 1, 0.1, "")),
+    WATER_FLOAT("Water Float", "Walk on water", false, Kind.CHEAT),
+    AUTO_RESPAWN("Auto Respawn", "Respawn the moment you die", false, Kind.CHEAT),
+    ANTI_AFK("Anti AFK", "Stay active so you are not kicked", false, Kind.CHEAT,
+            Setting.number("interval", "Every", 30, 10, 120, 10, " s")),
+    AUTO_SNEAK("Auto Sneak", "Always sneak", false, Kind.CHEAT),
+    FAST_SWIM("Fast Swim", "Swim much faster", false, Kind.CHEAT,
+            Setting.number("speed", "Swim speed", 1.6, 1.2, 4, 0.2, "x"));
 
     private enum Kind { ALWAYS_ON, FEATURE, HUD, CHEAT }
 

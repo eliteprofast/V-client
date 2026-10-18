@@ -190,6 +190,63 @@ public final class VClientMod implements ClientModInitializer {
         if (VConfig.enabled(Module.AUTO_WALK) && client.currentScreen == null) {
             client.options.forwardKey.setPressed(true);
         }
+        tickMoreCheats(client);
+    }
+
+    private static int afkTicks;
+    private static boolean longJumpWasOnGround;
+
+    /** Bunny Hop, Long Jump, Fast Climb, Water Float, Auto Respawn, Anti AFK, Auto Sneak and Fast Swim. */
+    private static void tickMoreCheats(MinecraftClient client) {
+        var player = client.player;
+        boolean free = client.currentScreen == null;
+        boolean forward = free && client.options.forwardKey.isPressed();
+        boolean onGround = player.isOnGround();
+        boolean inWater = player.isTouchingWater();
+
+        if (VConfig.enabled(Module.AUTO_RESPAWN) && player.isDead()) player.requestRespawn();
+
+        if (VConfig.enabled(Module.BUNNY_HOP) && forward && onGround && !player.isSneaking() && !inWater) player.jump();
+
+        var velocity = player.getVelocity();
+        if (VConfig.enabled(Module.LONG_JUMP) && longJumpWasOnGround && !onGround && forward && velocity.y > 0.25) {
+            double boost = VConfig.get(Module.LONG_JUMP, "boost");
+            player.setVelocity(velocity.x * boost, velocity.y, velocity.z * boost);
+        }
+        longJumpWasOnGround = onGround;
+
+        if (VConfig.enabled(Module.FAST_CLIMB) && player.isClimbing() && (forward || (free && client.options.jumpKey.isPressed()))) {
+            double speed = VConfig.get(Module.FAST_CLIMB, "speed");
+            player.setVelocity(velocity.x, Math.max(velocity.y, speed), velocity.z);
+        }
+
+        if (VConfig.enabled(Module.WATER_FLOAT) && inWater && !player.isSneaking()) {
+            double lift = free && client.options.jumpKey.isPressed() ? 0.3 : 0.11;
+            player.setVelocity(velocity.x, Math.max(velocity.y, lift), velocity.z);
+            player.fallDistance = 0;
+        }
+
+        if (VConfig.enabled(Module.FAST_SWIM) && forward && inWater && !onGround) {
+            double yaw = Math.toRadians(player.getYaw());
+            double speed = 0.2 * VConfig.get(Module.FAST_SWIM, "speed");
+            player.setVelocity(-Math.sin(yaw) * speed, velocity.y, Math.cos(yaw) * speed);
+        }
+
+        if (VConfig.enabled(Module.AUTO_SNEAK) && free) client.options.sneakKey.setPressed(true);
+
+        if (VConfig.enabled(Module.ANTI_AFK)) {
+            boolean moving = free && (client.options.forwardKey.isPressed() || client.options.backKey.isPressed()
+                    || client.options.leftKey.isPressed() || client.options.rightKey.isPressed()
+                    || client.options.jumpKey.isPressed());
+            afkTicks = moving ? 0 : afkTicks + 1;
+            if (afkTicks >= VConfig.get(Module.ANTI_AFK, "interval") * 20) {
+                afkTicks = 0;
+                if (onGround) player.jump();
+                player.setYaw(player.getYaw() + 1.5f);
+            }
+        } else {
+            afkTicks = 0;
+        }
     }
 
     /** Anti Knockback: whether a velocity packet for this entity should be ignored. */
