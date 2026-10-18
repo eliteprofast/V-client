@@ -35,6 +35,7 @@ internal static class StandaloneInstaller
             }
 
             RunWithProgress(installDirectory);
+            CreateShortcuts(installDirectory, executablePath);
             Process.Start(new ProcessStartInfo
             {
                 FileName = executablePath,
@@ -238,6 +239,36 @@ internal static class StandaloneInstaller
             throw new FileNotFoundException(
                 "The application bundle did not contain V-Client.exe.", executablePath);
         }
+    }
+
+    /// <summary>Adds V-Client to the Start menu app list and the desktop. Failure here must never fail the install.</summary>
+    private static void CreateShortcuts(string installDirectory, string executablePath)
+    {
+        try
+        {
+            string startMenu = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs");
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            WriteShortcut(Path.Combine(startMenu, "V-Client.lnk"), installDirectory, executablePath);
+            WriteShortcut(Path.Combine(desktop, "V-Client.lnk"), installDirectory, executablePath);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private static void WriteShortcut(string path, string installDirectory, string executablePath)
+    {
+        Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+        if (shellType == null) return;
+        object shell = Activator.CreateInstance(shellType);
+        object link = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { path });
+        Type linkType = link.GetType();
+        linkType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, link, new object[] { executablePath });
+        linkType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, link, new object[] { installDirectory });
+        linkType.InvokeMember("Description", BindingFlags.SetProperty, null, link, new object[] { "V-Client launcher for VSMP" });
+        linkType.InvokeMember("IconLocation", BindingFlags.SetProperty, null, link, new object[] { executablePath + ",0" });
+        linkType.InvokeMember("Save", BindingFlags.InvokeMethod, null, link, null);
     }
 
     private static Stream OpenPayload()
