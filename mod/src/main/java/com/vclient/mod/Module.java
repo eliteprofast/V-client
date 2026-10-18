@@ -71,7 +71,17 @@ public enum Module {
     GLOW_ESP("Glow ESP", "Outline players through walls", false, Kind.CHEAT,
             Setting.toggle("mobs", "Include mobs", false)),
     HITBOXES("Hitboxes", "Bigger enemy hitboxes", false, Kind.CHEAT,
-            Setting.number("size", "Extra size", 0.2, 0.1, 1, 0.1, " blocks"));
+            Setting.number("size", "Extra size", 0.2, 0.1, 1, 0.1, " blocks")),
+    NO_FALL("No Fall", "No fall damage", false, Kind.CHEAT),
+    SAFE_WALK("Safe Walk", "Never walk off an edge", false, Kind.CHEAT),
+    ANTI_KNOCKBACK("Anti Knockback", "Ignore being pushed by hits", false, Kind.CHEAT),
+    AIR_JUMP("Air Jump", "Jump again in mid-air", false, Kind.CHEAT),
+    GLIDE("Glide", "Hold jump to fall slowly", false, Kind.CHEAT,
+            Setting.number("speed", "Fall speed", 0.1, 0.02, 0.3, 0.02, "")),
+    FAST_BREAK("Fast Break", "No delay between breaking blocks", false, Kind.CHEAT),
+    TIME_CHANGER("Time Changer", "Pick the time of day you see", false, Kind.CHEAT,
+            Setting.choice("time", "Time", 1, "Day", "Noon", "Sunset", "Night", "Midnight", "Sunrise")),
+    AUTO_WALK("Auto Walk", "Keep walking forward", false, Kind.CHEAT);
 
     private enum Kind { ALWAYS_ON, FEATURE, HUD, CHEAT }
 

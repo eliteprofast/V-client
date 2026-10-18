@@ -51,7 +51,8 @@ public final class VClientMod implements ClientModInitializer {
         com.vclient.mod.cosmetics.Cosmetics.init();
         if (CHEATS_REQUESTED && cheatsAllowed()) {
             VConfig.setEnabled(Module.FREECAM, false);
-            LOGGER.info("Hacker mode unlocked: X-Ray, Reach-Hits, Speed Hack, Freecam, Fly, Auto Sprint, Step, Spider, High Jump, Fast Place, Glow ESP and Hitboxes are available.");
+            long cheatModules = java.util.Arrays.stream(Module.values()).filter(Module::cheat).count();
+            LOGGER.info("Hacker mode unlocked: {} hacker modules are available in the Right Shift menu.", cheatModules);
         }
         LOGGER.info("V-Client mod loaded. Press {} in game to open the mod menu.",
                 KeyNames.name(VConfig.integer(Module.CLIENT, "menuKey")));
@@ -149,6 +150,57 @@ public final class VClientMod implements ClientModInitializer {
         if (VConfig.enabled(Module.FAST_PLACE)) {
             ((com.vclient.mod.mixin.MinecraftClientAccessor) client).vclient$setItemUseCooldown(0);
         }
+        if (VConfig.enabled(Module.FAST_BREAK) && client.interactionManager != null) {
+            ((com.vclient.mod.mixin.ClientPlayerInteractionManagerAccessor) client.interactionManager)
+                    .vclient$setBlockBreakingCooldown(0);
+        }
+        tickWorldExtras(client);
+    }
+
+    private static int airJumpCooldown;
+
+    /** No Fall, Air Jump, Glide, Time Changer and Auto Walk. */
+    private static void tickWorldExtras(MinecraftClient client) {
+        var player = client.player;
+        if (VConfig.enabled(Module.NO_FALL) && player.fallDistance > 2.5 && !player.isOnGround()
+                && client.getNetworkHandler() != null) {
+            // Tell the server we are on the ground so it resets the fall distance before we land.
+            client.getNetworkHandler().sendPacket(new net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket
+                    .OnGroundOnly(true, player.horizontalCollision));
+            player.fallDistance = 0;
+        }
+        boolean jumpHeld = client.options.jumpKey.isPressed() && client.currentScreen == null;
+        if (airJumpCooldown > 0) airJumpCooldown--;
+        if (VConfig.enabled(Module.AIR_JUMP) && jumpHeld && !player.isOnGround() && airJumpCooldown == 0
+                && !player.isTouchingWater() && !player.isClimbing()) {
+            player.jump();
+            airJumpCooldown = 8;
+        }
+        if (VConfig.enabled(Module.GLIDE) && jumpHeld && !player.isOnGround() && !player.isTouchingWater()) {
+            var velocity = player.getVelocity();
+            double limit = -VConfig.get(Module.GLIDE, "speed");
+            if (velocity.y < limit) player.setVelocity(velocity.x, limit, velocity.z);
+            player.fallDistance = 0;
+        }
+        if (VConfig.enabled(Module.TIME_CHANGER) && client.world != null) {
+            long[] times = {1000, 6000, 12000, 13000, 18000, 23000};
+            int choice = Math.clamp(VConfig.integer(Module.TIME_CHANGER, "time"), 0, times.length - 1);
+            client.world.setTime(client.world.getTime(), times[choice], false);
+        }
+        if (VConfig.enabled(Module.AUTO_WALK) && client.currentScreen == null) {
+            client.options.forwardKey.setPressed(true);
+        }
+    }
+
+    /** Anti Knockback: whether a velocity packet for this entity should be ignored. */
+    public static boolean ignoreKnockback(int entityId) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        return VConfig.enabled(Module.ANTI_KNOCKBACK) && client.player != null && client.player.getId() == entityId;
+    }
+
+    /** Safe Walk: the local player behaves as if sneaking at ledges. */
+    public static boolean safeWalk(net.minecraft.entity.Entity entity) {
+        return VConfig.enabled(Module.SAFE_WALK) && entity == MinecraftClient.getInstance().player;
     }
 
     private static boolean wasOnGround;
