@@ -52,7 +52,7 @@ final class ModrinthModService {
                 + "&facets=" + encode(facets);
         onProgress.accept("Searching Modrinth for " + target.loader() + " mods for Minecraft "
                 + target.gameVersion() + "...");
-        JsonNode response = getJson(API_BASE.resolve(endpoint));
+        JsonNode response = getJson(API_BASE.resolve(endpoint), onProgress);
         JsonNode hits = response.path("hits");
         if (!hits.isArray()) {
             throw new IOException("Modrinth returned an invalid mod search response.");
@@ -130,7 +130,7 @@ final class ModrinthModService {
         String endpoint = "project/" + encodePathSegment(projectId) + "/version?game_versions="
                 + encode("[\"" + target.gameVersion() + "\"]")
                 + "&loaders=" + encode("[\"" + target.loader() + "\"]");
-        JsonNode versions = getJson(API_BASE.resolve(endpoint));
+        JsonNode versions = getJson(API_BASE.resolve(endpoint), onProgress);
         if (!versions.isArray()) {
             throw new IOException("Modrinth returned an invalid version list.");
         }
@@ -261,17 +261,28 @@ final class ModrinthModService {
         }
     }
 
-    private static JsonNode getJson(URI uri) throws IOException, InterruptedException {
+    private static JsonNode getJson(URI uri, Consumer<String> log) throws IOException, InterruptedException {
         if (!"https".equalsIgnoreCase(uri.getScheme()) || !"api.modrinth.com".equalsIgnoreCase(uri.getHost())) {
             throw new IOException("Refusing to contact a non-Modrinth API host.");
         }
+        log.accept("Modrinth request: GET " + uri.getScheme() + "://" + uri.getHost() + uri.getRawPath()
+                + " (Java " + System.getProperty("java.version") + ", TLS " + PlatformTls.enabledProtocols()
+                + ", route " + PlatformTls.proxyDescription(uri) + ").");
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(30))
                 .header("Accept", "application/json")
                 .header("User-Agent", "V-Client/1.0.0 (https://github.com/eliteprofast/V-client)")
                 .GET().build();
-        HttpResponse<String> response = PlatformTls.sendWithRetries(
-                HTTP, request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8), line -> {});
+        HttpResponse<String> response;
+        try {
+            response = PlatformTls.sendWithRetries(
+                    HTTP, request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8), log);
+        } catch (IOException e) {
+            IOException explained = JavaRuntimeManager.explainTlsFailure(uri.toString(), e);
+            log.accept("Modrinth request failed: " + explained.getMessage());
+            throw explained;
+        }
+        log.accept("Modrinth answered HTTP " + response.statusCode() + " (" + response.body().length() + " characters).");
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IOException("Modrinth API returned HTTP " + response.statusCode() + ".");
         }

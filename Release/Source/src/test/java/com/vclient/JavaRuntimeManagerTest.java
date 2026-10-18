@@ -60,9 +60,31 @@ final class JavaRuntimeManagerTest {
     void explainsTlsFailuresWithoutDisablingCertificateValidation() {
         IOException error = JavaRuntimeManager.explainTlsFailure(
                 "https://piston-meta.mojang.com/version_manifest.json",
-                new IOException("request failed", new SSLHandshakeException("handshake_failure")));
+                new IOException("request failed", new SSLHandshakeException("handshake_failure")),
+                host -> null);
 
         assertTrue(error.getMessage().contains("piston-meta.mojang.com"));
         assertTrue(error.getMessage().contains("will not disable certificate validation"));
+    }
+
+    @Test
+    void namesADnsFilterWhenTheHostResolvesToABlockPage() {
+        IOException error = JavaRuntimeManager.explainTlsFailure(
+                "https://api.modrinth.com/v2/search",
+                new IOException("request failed", new SSLHandshakeException("handshake_failure")),
+                host -> new DnsBlock.Finding(host, java.util.List.of("146.112.61.106"), "104.18.23.35"));
+
+        assertTrue(error.getMessage().contains("api.modrinth.com resolves to 146.112.61.106"));
+        assertTrue(error.getMessage().contains("104.18.23.35"));
+        assertTrue(error.getMessage().contains("not a certificate or Java problem"));
+    }
+
+    @Test
+    void recognisesBlockPageAddresses() throws Exception {
+        assertTrue(DnsBlock.isSinkhole(java.net.InetAddress.getByName("146.112.61.106")));
+        assertTrue(DnsBlock.isSinkhole(java.net.InetAddress.getByName("0.0.0.0")));
+        assertTrue(DnsBlock.isSinkhole(java.net.InetAddress.getByName("127.0.0.1")));
+        org.junit.jupiter.api.Assertions.assertFalse(DnsBlock.isSinkhole(java.net.InetAddress.getByName("104.18.23.35")));
+        org.junit.jupiter.api.Assertions.assertFalse(DnsBlock.isSinkhole(java.net.InetAddress.getByName("192.168.1.10")));
     }
 }

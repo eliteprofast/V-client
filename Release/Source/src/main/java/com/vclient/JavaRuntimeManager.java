@@ -348,6 +348,25 @@ final class JavaRuntimeManager {
     }
 
     static IOException explainTlsFailure(String address, IOException error) {
+        return explainTlsFailure(address, error, DnsBlock::inspect);
+    }
+
+    /** {@code dnsCheck} looks a host up; it is a parameter so tests do not depend on the network they run on. */
+    static IOException explainTlsFailure(String address, IOException error,
+                                         java.util.function.Function<String, DnsBlock.Finding> dnsCheck) {
+        String host = null;
+        try {
+            host = URI.create(address).getHost();
+        } catch (IllegalArgumentException ignored) {
+            // Not a URL; fall through to the generic messages.
+        }
+        if (host != null) {
+            DnsBlock.Finding blocked = dnsCheck.apply(host);
+            if (blocked != null) {
+                return new IOException(DnsBlock.explain(blocked) + " (Technical detail: "
+                        + PlatformTls.describeFailure(error) + ")", error);
+            }
+        }
         Throwable cause = error;
         while (cause != null) {
             if (cause instanceof javax.net.ssl.SSLException) {
