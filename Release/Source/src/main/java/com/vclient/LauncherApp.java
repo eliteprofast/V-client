@@ -98,6 +98,7 @@ public final class LauncherApp extends Application {
     private final List<String> localFriends = new ArrayList<>();
     private final List<String> logLines = new ArrayList<>();
     private final Map<Page, Button> navigationButtons = new EnumMap<>(Page.class);
+    private Page hoveredPage;
     private List<MinecraftLauncher.InstalledVersion> installedVersions = List.of();
     private MinecraftLauncher.VersionCatalog versionCatalog;
     private final java.util.Set<String> versionsDownloading = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -155,6 +156,15 @@ public final class LauncherApp extends Application {
         if (account == null) showLogin();
         else showHome();
         stage.show();
+        String startPage = System.getProperty("vclient.startPage", "");
+        if (!startPage.isBlank() && account != null) {
+            // Debugging aid: -Dvclient.startPage=MODS opens that page straight away.
+            try {
+                navigate(Page.valueOf(startPage.strip().toUpperCase(java.util.Locale.ROOT)));
+            } catch (IllegalArgumentException e) {
+                appendLog("Unknown vclient.startPage value: " + startPage);
+            }
+        }
         startBackendTasks();
     }
 
@@ -1437,312 +1447,414 @@ public final class LauncherApp extends Application {
         StackPane root = baseLayout();
         VBox content = pageContent("Modrinth", "Mods",
                 "Browse Modrinth and install mods straight into your mods folder. The folder is created automatically on your first install.");
-        Path modsDirectory = settings.minecraftDirectory().resolve("mods").toAbsolutePath().normalize();
-        AtomicInteger searchGeneration = new AtomicInteger();
+        ModsPage page = new ModsPage(content);
+        content.getChildren().addAll(page.controlsCard(), page.notice, page.resultsCard(), page.installedCard());
+        setPageContent(root, content);
+        stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+        page.start();
+    }
 
-        VBox browseCard = card();
-        Label profileTitle = label("MOD-LOADER PROFILE", 11, MUTED);
-        ComboBox<MinecraftLauncher.InstalledVersion> profilePicker = new ComboBox<>();
-        profilePicker.setMaxWidth(Double.MAX_VALUE);
-        profilePicker.setPrefHeight(44);
-        profilePicker.setStyle("-fx-background-color: rgba(20, 20, 45, 0.92); -fx-text-fill: #f3f0ff; -fx-font-size: 14px; -fx-border-color: #48415f; -fx-border-radius: 8; -fx-background-radius: 8;");
-        profilePicker.setPromptText("Scanning installed Fabric, Forge, NeoForge, and Quilt profiles...");
-        HBox searchRow = new HBox(10);
-        searchRow.setAlignment(Pos.CENTER_LEFT);
-        TextField query = new TextField();
-        query.setPromptText("Search Modrinth mods (leave empty for most popular)");
-        query.setStyle(fieldStyle());
-        HBox.setHgrow(query, Priority.ALWAYS);
-        Button search = button("SEARCH", ACCENT, 11);
-        searchRow.getChildren().addAll(query, search);
-        Label browseStatus = label("Select a mod-loader profile to browse compatible mods.", 11, MUTED);
-        browseStatus.setWrapText(true);
+    /** The Mods page: one glass card for the controls, one for the results, one for what is installed. */
+    private final class ModsPage {
+        private final Path modsDirectory = settings.minecraftDirectory().resolve("mods").toAbsolutePath().normalize();
+        private final AtomicInteger generation = new AtomicInteger();
+        private final List<javafx.animation.Animation> animations = new ArrayList<>();
+        private final java.util.Map<String, Image> iconCache = new java.util.HashMap<>();
+        private final VBox content;
+        private final ComboBox<MinecraftLauncher.InstalledVersion> profilePicker = new ComboBox<>();
+        private final TextField query = new TextField();
+        private final Button search = new Button("SEARCH");
+        private final VBox notice = new VBox(10);
+        private final VBox resultsBody = new VBox(12);
+        private final HBox resultsHeader = new HBox(12);
+        private final Label resultsCount = ModsUi.chip("", ModsUi.MUTED);
+        private final VBox installedBody = new VBox(8);
+        private final Label installedCount = ModsUi.chip("", ModsUi.MUTED);
+        private List<ModrinthModService.ModProject> current = List.of();
+        private javafx.scene.layout.FlowPane flow;
 
-        ListView<Path> installedList = new ListView<>();
-        Label installedStatus = label("", 11, MUTED);
-        installedStatus.setWrapText(true);
-        Runnable refreshInstalled = () -> loadInstalledMods(modsDirectory, installedList, installedStatus);
+        ModsPage(VBox content) {
+            this.content = content;
+            notice.setMaxWidth(Double.MAX_VALUE);
+            notice.setManaged(false);
+            notice.setVisible(false);
+            // The two-column grid follows the real width of the results area.
+            resultsBody.widthProperty().addListener((observable, oldWidth, newWidth) -> layoutColumns());
+        }
 
-        ListView<ModrinthModService.ModProject> results = new ListView<>();
-        results.setPlaceholder(label("No mods to show yet.", 13, MUTED));
-        results.setStyle("-fx-control-inner-background: rgba(9, 10, 28, 0.82); -fx-background-color: transparent; -fx-border-color: rgba(170, 151, 207, 0.24);");
-        results.setPrefHeight(340);
-        results.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(ModrinthModService.ModProject project, boolean empty) {
-                super.updateItem(project, empty);
-                if (empty || project == null) {
-                    setText(null);
-                    setGraphic(null);
-                    return;
+        private static final String FIELD = "-fx-background-color: rgba(8, 9, 26, 0.85); -fx-text-fill: #f5f7fd;"
+                + " -fx-prompt-text-fill: #7f7fa6; -fx-font-size: 13px; -fx-border-color: rgba(255,255,255,0.14);"
+                + " -fx-background-radius: 12; -fx-border-radius: 12; -fx-padding: 0 14 0 14;";
+
+        VBox controlsCard() {
+            VBox card = ModsUi.glassCard(14, new Insets(20));
+            profilePicker.setPromptText("Scanning profiles...");
+            profilePicker.setStyle(FIELD);
+            // The closed box and the dropdown rows both need light text on the dark glass.
+            profilePicker.setButtonCell(profileCell());
+            profilePicker.setCellFactory(list -> profileCell());
+            profilePicker.setPrefWidth(250);
+            profilePicker.setMinWidth(170);
+            query.setPromptText("Search Modrinth (leave empty for the most popular)");
+            query.setStyle(FIELD);
+            search.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: #171326; -fx-font-size: 12px;"
+                    + " -fx-font-weight: bold; -fx-background-radius: 12; -fx-padding: 0 24 0 24; -fx-cursor: hand;");
+            for (javafx.scene.layout.Region control : List.of(profilePicker, query, search)) {
+                control.setMinHeight(44);
+                control.setPrefHeight(44);
+                control.setMaxHeight(44);
+            }
+            search.setMinWidth(Region.USE_PREF_SIZE);
+            query.setMinWidth(120);
+            HBox.setHgrow(query, Priority.ALWAYS);
+            HBox row = new HBox(12, profilePicker, query, search);
+            row.setAlignment(Pos.CENTER_LEFT);
+            card.getChildren().addAll(ModsUi.sectionTitle("Find mods"), row);
+            search.setOnAction(event -> runSearch());
+            query.setOnAction(event -> runSearch());
+            profilePicker.valueProperty().addListener((observable, oldProfile, newProfile) -> {
+                if (newProfile != null) runSearch();
+            });
+            return card;
+        }
+
+        VBox resultsCard() {
+            VBox card = ModsUi.glassCard(14, new Insets(20));
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            resultsHeader.setAlignment(Pos.CENTER_LEFT);
+            resultsHeader.getChildren().addAll(ModsUi.sectionTitle("Results"), resultsCount, spacer);
+            resultsCount.setVisible(false);
+            resultsCount.setManaged(false);
+            resultsBody.getChildren().add(ModsUi.emptyCard("✦", "Pick a profile to browse mods",
+                    "Choose a Fabric, Forge, NeoForge or Quilt profile above and the compatible mods appear here."));
+            card.getChildren().addAll(resultsHeader, resultsBody);
+            return card;
+        }
+
+        VBox installedCard() {
+            VBox card = ModsUi.glassCard(14, new Insets(20));
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            Button refresh = secondaryButton("REFRESH");
+            refresh.setOnAction(event -> loadInstalled());
+            Button openFolder = secondaryButton("OPEN FOLDER");
+            openFolder.setOnAction(event -> {
+                try {
+                    Files.createDirectories(modsDirectory);
+                    if (!Desktop.isDesktopSupported()) throw new IOException("This computer does not support opening folders from V-Client.");
+                    Desktop.getDesktop().open(modsDirectory.toFile());
+                } catch (IOException | UnsupportedOperationException e) {
+                    showNotice(ModsUi.warningBox("Couldn't open the mods folder", e.getMessage(), null));
                 }
-                ImageView icon = new ImageView();
-                icon.setFitWidth(42);
-                icon.setFitHeight(42);
-                icon.setPreserveRatio(true);
-                Image iconImage = modIcon(project.iconUrl());
-                if (iconImage != null) icon.setImage(iconImage);
-                StackPane iconBox = new StackPane(icon);
-                iconBox.setMinSize(46, 46);
-                iconBox.setMaxSize(46, 46);
-                iconBox.setStyle("-fx-background-color: rgba(41, 38, 66, 0.9); -fx-background-radius: 8;");
-                Label name = label(project.title(), 14, "#f3f6fc");
-                name.setStyle(name.getStyle() + "-fx-font-weight: bold;");
-                Label description = label(project.description(), 11, MUTED);
-                description.setWrapText(true);
-                Label details = label(formatDownloads(project.downloads()) + " downloads  ·  "
-                        + project.versionNumber() + "  ·  " + project.fileName(), 10, "#7f7fa6");
-                details.setWrapText(true);
-                VBox text = new VBox(4, name, description, details);
-                text.setMinWidth(0);
-                HBox.setHgrow(text, Priority.ALWAYS);
+            });
+            HBox header = new HBox(10, ModsUi.sectionTitle("Installed mods"), installedCount, spacer, refresh, openFolder);
+            header.setAlignment(Pos.CENTER_LEFT);
+            Label path = ModsUi.text(modsDirectory.toString(), 10, "#7f7fa6", false);
+            path.setWrapText(true);
+            card.getChildren().addAll(header, path, installedBody);
+            return card;
+        }
+
+        private ListCell<MinecraftLauncher.InstalledVersion> profileCell() {
+            return new ListCell<>() {
+                @Override
+                protected void updateItem(MinecraftLauncher.InstalledVersion version, boolean empty) {
+                    super.updateItem(version, empty);
+                    setText(empty || version == null ? null : version.displayName());
+                    setStyle("-fx-text-fill: #f5f7fd; -fx-font-size: 13px; -fx-background-color: transparent;");
+                }
+            };
+        }
+
+        private Button secondaryButton(String label) {
+            Button button = new Button(label);
+            button.setMinHeight(34);
+            button.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-text-fill: #f5f7fd; -fx-font-size: 11px;"
+                    + " -fx-font-weight: bold; -fx-background-radius: 10; -fx-padding: 0 14 0 14; -fx-cursor: hand;");
+            return button;
+        }
+
+        void start() {
+            loadInstalled();
+            executor.execute(() -> {
+                try {
+                    List<MinecraftLauncher.InstalledVersion> found = gameLauncher.findVersions(settings.minecraftDirectory());
+                    List<MinecraftLauncher.InstalledVersion> loaderProfiles = found.stream()
+                            .filter(version -> !"Vanilla".equals(version.loader())).toList();
+                    Platform.runLater(() -> {
+                        installedVersions = found;
+                        if (activePage != Page.MODS) return;
+                        profilePicker.getItems().setAll(loaderProfiles);
+                        if (loaderProfiles.isEmpty()) {
+                            profilePicker.setPromptText("No mod-loader profiles");
+                            showNotice(ModsUi.warningBox("No mod-loader profile installed",
+                                    "Mods need a Fabric, Forge, NeoForge or Quilt profile. Install one in V-Client's game folder, then come back.",
+                                    null));
+                            return;
+                        }
+                        profilePicker.setValue(loaderProfiles.stream()
+                                .filter(version -> version.id().equals(selectedVersionId))
+                                .findFirst().orElse(loaderProfiles.getFirst()));
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> showNotice(ModsUi.warningBox("Couldn't scan your profiles", e.getMessage(), null)));
+                }
+            });
+        }
+
+        // ---- notices and states ----------------------------------------------------------------------
+
+        private void showNotice(javafx.scene.Node box) {
+            notice.getChildren().setAll(box);
+            notice.setManaged(true);
+            notice.setVisible(true);
+        }
+
+        private void clearNotice() {
+            notice.getChildren().clear();
+            notice.setManaged(false);
+            notice.setVisible(false);
+        }
+
+        private void showLoading(String message) {
+            ModsUi.stop(animations);
+            HBox busy = ModsUi.busyLabel(message);
+            resultsCount.setVisible(false);
+            resultsCount.setManaged(false);
+            resultsBody.getChildren().setAll(busy, ModsUi.skeleton(3, animations));
+        }
+
+        private void showResults(List<ModrinthModService.ModProject> found, ModrinthModService.Target target) {
+            ModsUi.stop(animations);
+            current = found;
+            resultsCount.setText(found.size() + (found.size() == 1 ? " mod" : " mods") + "  ·  " + target.loader()
+                    + "  ·  " + target.gameVersion());
+            resultsCount.setVisible(true);
+            resultsCount.setManaged(true);
+            if (found.isEmpty()) {
+                resultsBody.getChildren().setAll(ModsUi.emptyCard("⌕", "No mods found",
+                        "Nothing compatible with " + target.loader() + " on Minecraft " + target.gameVersion()
+                                + (query.getText() == null || query.getText().isBlank() ? "" : " matches “" + query.getText().strip() + "”")
+                                + ". Try another search or profile."));
+                return;
+            }
+            renderCards();
+        }
+
+        private void renderCards() {
+            flow = new javafx.scene.layout.FlowPane(12, 12);
+            flow.setMaxWidth(Double.MAX_VALUE);
+            for (ModrinthModService.ModProject project : current) {
                 boolean installed = Files.isRegularFile(modsDirectory.resolve(project.fileName()));
                 boolean downloading = modsDownloading.contains(project.fileName());
-                Button install = button(installed ? "INSTALLED" : downloading ? "INSTALLING..." : "INSTALL",
-                        installed ? "#244a38" : ACCENT, 10);
-                install.setMinWidth(Region.USE_PREF_SIZE);
-                install.setDisable(installed || downloading);
-                install.setOnAction(event -> installMod(project, modsDirectory, results, browseStatus, refreshInstalled));
-                HBox row = new HBox(14, iconBox, text, install);
-                row.setAlignment(Pos.CENTER_LEFT);
-                row.setPadding(new Insets(8, 4, 8, 4));
-                row.setMaxWidth(Double.MAX_VALUE);
-                setText(null);
-                setGraphic(row);
-                setPrefWidth(0);
+                Image icon = iconCache.computeIfAbsent(project.iconUrl(), url -> modIcon(url));
+                flow.getChildren().add(ModsUi.modCard(project, icon, installed, downloading,
+                        formatDownloads(project.downloads()), () -> install(project)));
             }
-        });
+            resultsBody.getChildren().setAll(flow);
+            layoutColumns();
+        }
 
-        Runnable runSearch = () -> {
+        private void layoutColumns() {
+            if (flow == null) return;
+            double available = resultsBody.getWidth() > 0 ? resultsBody.getWidth() : Math.max(300, content.getWidth() - 110);
+            flow.setPrefWrapLength(available);
+            ModsUi.applyColumns(flow, available);
+        }
+
+        private void showFailure(Exception error) {
+            ModsUi.stop(animations);
+            resultsCount.setVisible(false);
+            resultsCount.setManaged(false);
+            String[] message = ModsUi.describeFailure("Modrinth", error.getMessage());
+            resultsBody.getChildren().setAll(ModsUi.warningBox(message[0], message[1], this::runSearch));
+        }
+
+        // ---- search ----------------------------------------------------------------------------------
+
+        void runSearch() {
             if (settings.offlineMode()) {
-                browseStatus.setText("Offline mode is on, so Modrinth is not contacted. Turn it off on Home to browse and install mods.");
+                showNotice(ModsUi.warningBox("Offline mode is on",
+                        "Modrinth is not contacted while offline mode is on. Turn it off on the Home page to browse and install mods.", null));
                 return;
             }
             MinecraftLauncher.InstalledVersion profile = profilePicker.getValue();
             if (profile == null) {
-                browseStatus.setText("Install a Fabric, Forge, NeoForge, or Quilt profile first, then pick it above.");
+                showNotice(ModsUi.warningBox("Choose a profile first",
+                        "Install a Fabric, Forge, NeoForge or Quilt profile, then pick it in the list above.", null));
                 return;
             }
-            searchMods(profile, query.getText() == null ? "" : query.getText(), results, browseStatus,
-                    search, searchGeneration);
-        };
-        search.setOnAction(event -> runSearch.run());
-        query.setOnAction(event -> runSearch.run());
-        profilePicker.valueProperty().addListener((observable, oldProfile, newProfile) -> {
-            results.getItems().clear();
-            if (newProfile != null) runSearch.run();
-        });
-        browseCard.getChildren().addAll(profileTitle, profilePicker, searchRow, browseStatus, results);
-
-        VBox installedCard = card();
-        HBox installedHeading = new HBox(10);
-        installedHeading.setAlignment(Pos.CENTER_LEFT);
-        Label installedTitle = label("INSTALLED MODS", 11, MUTED);
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        Button refresh = button("REFRESH", "#292642", 10);
-        refresh.setOnAction(event -> refreshInstalled.run());
-        Button openFolder = button("OPEN MODS FOLDER", "#292642", 10);
-        openFolder.setOnAction(event -> {
-            try {
-                Files.createDirectories(modsDirectory);
-                if (!Desktop.isDesktopSupported()) throw new IOException("This computer does not support opening folders from V-Client.");
-                Desktop.getDesktop().open(modsDirectory.toFile());
-            } catch (IOException | UnsupportedOperationException e) {
-                showError("Could not open the mods folder", e);
-            }
-        });
-        installedHeading.getChildren().addAll(installedTitle, spacer, refresh, openFolder);
-        installedList.setPlaceholder(label("No mods installed yet.", 13, MUTED));
-        installedList.setStyle("-fx-control-inner-background: rgba(9, 10, 28, 0.82); -fx-background-color: transparent; -fx-border-color: rgba(170, 151, 207, 0.24);");
-        installedList.setPrefHeight(200);
-        installedList.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(Path file, boolean empty) {
-                super.updateItem(file, empty);
-                if (empty || file == null) {
-                    setText(null);
-                    setGraphic(null);
-                    return;
+            clearNotice();
+            int mine = generation.incrementAndGet();
+            search.setDisable(true);
+            showLoading("Searching Modrinth…");
+            Path minecraftDirectory = settings.minecraftDirectory();
+            String text = query.getText() == null ? "" : query.getText();
+            executor.execute(() -> {
+                try {
+                    ModrinthModService.Target target = ModrinthModService.resolveTarget(minecraftDirectory, profile);
+                    List<ModrinthModService.ModProject> found = modrinthModService.search(text, target, message -> {
+                        Platform.runLater(() -> appendLog(message));
+                    });
+                    Platform.runLater(() -> {
+                        if (generation.get() == mine) showResults(found, target);
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        if (generation.get() != mine) return;
+                        showFailure(e);
+                        appendLog("Modrinth search failed: " + e.getMessage());
+                    });
+                } finally {
+                    Platform.runLater(() -> {
+                        if (generation.get() == mine) search.setDisable(false);
+                    });
                 }
+            });
+        }
+
+        // ---- install / installed list ------------------------------------------------------------------
+
+        private void install(ModrinthModService.ModProject project) {
+            if (settings.offlineMode()) {
+                showNotice(ModsUi.warningBox("Offline mode is on", "Turn it off on the Home page to install mods.", null));
+                return;
+            }
+            if (!modsDownloading.add(project.fileName())) return;
+            clearNotice();
+            renderCardsIfShown();
+            appendLog("Installing mod " + project.title() + " (" + project.fileName() + ") into " + modsDirectory + ".");
+            Path minecraftDirectory = modsDirectory.getParent();
+            executor.execute(() -> {
+                try {
+                    Path installed = modrinthModService.install(project, minecraftDirectory,
+                            message -> Platform.runLater(() -> appendLog(message)));
+                    Platform.runLater(() -> {
+                        appendLog("Installed mod " + installed + ".");
+                        showNotice(successBox(project.title() + " installed"));
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        appendLog("Mod install failed for " + project.title() + ": " + e.getMessage());
+                        String[] message = ModsUi.describeFailure("Installing " + project.title(), e.getMessage());
+                        showNotice(ModsUi.warningBox(message[0], message[1], null));
+                    });
+                } finally {
+                    modsDownloading.remove(project.fileName());
+                    Platform.runLater(() -> {
+                        renderCardsIfShown();
+                        loadInstalled();
+                    });
+                }
+            });
+        }
+
+        private HBox successBox(String message) {
+            Label icon = ModsUi.text("✓", 16, "#08140e", true);
+            icon.setMinSize(30, 30);
+            icon.setAlignment(Pos.CENTER);
+            icon.setStyle(icon.getStyle() + " -fx-background-color: " + ModsUi.GOOD + "; -fx-background-radius: 15;");
+            HBox box = new HBox(12, icon, ModsUi.text(message, 13, "#bff5d6", true));
+            box.setAlignment(Pos.CENTER_LEFT);
+            box.setPadding(new Insets(12, 16, 12, 14));
+            box.setStyle("-fx-background-color: rgba(57,217,138,0.10); -fx-background-radius: 14;"
+                    + " -fx-border-color: rgba(57,217,138,0.40); -fx-border-radius: 14;");
+            return box;
+        }
+
+        private void renderCardsIfShown() {
+            if (flow != null && !current.isEmpty() && resultsBody.getChildren().contains(flow)) renderCards();
+        }
+
+        void loadInstalled() {
+            executor.execute(() -> {
+                List<Path> mods = new ArrayList<>();
+                String error = null;
+                if (Files.isDirectory(modsDirectory)) {
+                    try (var files = Files.list(modsDirectory)) {
+                        files.filter(Files::isRegularFile)
+                                .filter(file -> {
+                                    String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+                                    return name.endsWith(".jar") || name.endsWith(".jar.disabled");
+                                })
+                                .sorted(java.util.Comparator.comparing(file -> file.getFileName().toString().toLowerCase(java.util.Locale.ROOT)))
+                                .forEach(mods::add);
+                    } catch (IOException e) {
+                        error = e.getMessage();
+                    }
+                }
+                String scanError = error;
+                Platform.runLater(() -> showInstalled(mods, scanError));
+            });
+        }
+
+        private void showInstalled(List<Path> mods, String scanError) {
+            installedCount.setText(String.valueOf(mods.size()));
+            if (scanError != null) {
+                installedBody.getChildren().setAll(ModsUi.warningBox("Couldn't read the mods folder", scanError, null));
+                return;
+            }
+            if (mods.isEmpty()) {
+                installedBody.getChildren().setAll(ModsUi.emptyCard("▣", "No mods installed yet",
+                        Files.isDirectory(modsDirectory) ? "Install a mod from the results above."
+                                : "The mods folder is created on your first install."));
+                return;
+            }
+            List<javafx.scene.Node> rows = new ArrayList<>();
+            for (Path file : mods) {
                 String fileName = file.getFileName().toString();
                 boolean disabled = fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".disabled");
-                Label name = label(fileName, 13, disabled ? MUTED : "#f3f6fc");
-                Label details = label(disabled ? "Disabled" : "Enabled", 10, disabled ? "#7f7fa6" : "#39d98a");
-                VBox item = new VBox(3, name, details);
-                item.setPadding(new Insets(6, 2, 6, 2));
-                setText(null);
-                setGraphic(item);
+                Label name = ModsUi.text(fileName, 13, disabled ? ModsUi.MUTED : ModsUi.TEXT, true);
+                name.setMinWidth(0);
+                HBox.setHgrow(name, Priority.ALWAYS);
+                name.setMaxWidth(Double.MAX_VALUE);
+                Label state = ModsUi.chip(disabled ? "Disabled" : "Enabled", disabled ? "#7f7fa6" : ModsUi.GOOD);
+                Button remove = new Button("REMOVE");
+                remove.setMinHeight(32);
+                remove.setStyle("-fx-background-color: rgba(255,99,120,0.14); -fx-text-fill: #ff9aa8; -fx-font-size: 10px;"
+                        + " -fx-font-weight: bold; -fx-background-radius: 9; -fx-padding: 0 14 0 14; -fx-cursor: hand;");
+                remove.setOnAction(event -> removeMod(file));
+                HBox row = new HBox(12, name, state, remove);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.setPadding(new Insets(8, 12, 8, 14));
+                String base = "-fx-background-color: rgba(255,255,255,0.045); -fx-background-radius: 12;";
+                row.setStyle(base);
+                row.setOnMouseEntered(event -> row.setStyle(base + " -fx-background-color: rgba(255,255,255,0.09);"));
+                row.setOnMouseExited(event -> row.setStyle(base));
+                rows.add(row);
             }
-        });
-        Button remove = button("REMOVE SELECTED MOD", "#482332", 10);
-        remove.setOnAction(event -> removeSelectedMod(modsDirectory, installedList, refreshInstalled));
-        installedCard.getChildren().addAll(installedHeading,
-                label(modsDirectory.toString(), 10, MUTED), installedList, remove, installedStatus);
+            installedBody.getChildren().setAll(rows);
+        }
 
-        content.getChildren().addAll(browseCard, installedCard);
-        setPageContent(root, content);
-        stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
-        refreshInstalled.run();
-
-        executor.execute(() -> {
+        private void removeMod(Path selected) {
+            Path file = selected.toAbsolutePath().normalize();
+            if (!modsDirectory.equals(file.getParent())) {
+                showNotice(ModsUi.warningBox("Couldn't remove the mod", "That file is not inside V-Client's mods folder.", null));
+                return;
+            }
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                    "Remove " + file.getFileName() + " from your mods folder?", ButtonType.OK, ButtonType.CANCEL);
+            confirm.initOwner(stage);
+            confirm.setTitle("V-Client");
+            confirm.setHeaderText("Remove mod");
+            if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
             try {
-                List<MinecraftLauncher.InstalledVersion> found = gameLauncher.findVersions(settings.minecraftDirectory());
-                List<MinecraftLauncher.InstalledVersion> loaderProfiles = found.stream()
-                        .filter(version -> !"Vanilla".equals(version.loader())).toList();
-                Platform.runLater(() -> {
-                    installedVersions = found;
-                    if (activePage != Page.MODS) return;
-                    profilePicker.getItems().setAll(loaderProfiles);
-                    if (loaderProfiles.isEmpty()) {
-                        profilePicker.setPromptText("No mod-loader profiles installed");
-                        browseStatus.setText("Mods need a Fabric, Forge, NeoForge, or Quilt profile. Install one in V-Client's game folder, then come back.");
-                        return;
-                    }
-                    profilePicker.setValue(loaderProfiles.stream()
-                            .filter(version -> version.id().equals(selectedVersionId))
-                            .findFirst().orElse(loaderProfiles.getFirst()));
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> browseStatus.setText("Could not scan profiles: " + e.getMessage()));
+                Files.deleteIfExists(file);
+                appendLog("Removed mod " + file + ".");
+            } catch (IOException e) {
+                showNotice(ModsUi.warningBox("Couldn't remove the mod", e.getMessage(), null));
             }
-        });
-    }
-
-    private void searchMods(MinecraftLauncher.InstalledVersion profile, String query,
-                            ListView<ModrinthModService.ModProject> results, Label browseStatus,
-                            Button search, AtomicInteger searchGeneration) {
-        int generation = searchGeneration.incrementAndGet();
-        search.setDisable(true);
-        results.getItems().clear();
-        browseStatus.setText("Searching Modrinth...");
-        Path minecraftDirectory = settings.minecraftDirectory();
-        executor.execute(() -> {
-            try {
-                ModrinthModService.Target target = ModrinthModService.resolveTarget(minecraftDirectory, profile);
-                List<ModrinthModService.ModProject> found = modrinthModService.search(query, target, message ->
-                        Platform.runLater(() -> {
-                            if (searchGeneration.get() == generation) browseStatus.setText(message);
-                        }));
-                Platform.runLater(() -> {
-                    if (searchGeneration.get() != generation) return;
-                    results.getItems().setAll(found);
-                    browseStatus.setText(found.isEmpty()
-                            ? "No compatible " + target.loader() + " mods found for Minecraft " + target.gameVersion() + "."
-                            : found.size() + " compatible mods for " + target.loader() + " · Minecraft " + target.gameVersion() + ".");
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    if (searchGeneration.get() != generation) return;
-                    browseStatus.setText("Mod search failed: " + e.getMessage());
-                    appendLog("Modrinth search failed: " + e.getMessage());
-                });
-            } finally {
-                Platform.runLater(() -> {
-                    if (searchGeneration.get() == generation) search.setDisable(false);
-                });
-            }
-        });
-    }
-
-    private void installMod(ModrinthModService.ModProject project, Path modsDirectory,
-                            ListView<ModrinthModService.ModProject> results, Label browseStatus,
-                            Runnable refreshInstalled) {
-        if (settings.offlineMode()) {
-            browseStatus.setText("Offline mode is on. Turn it off on Home to install mods.");
-            return;
+            renderCardsIfShown();
+            loadInstalled();
         }
-        if (!modsDownloading.add(project.fileName())) return;
-        results.refresh();
-        browseStatus.setText("Installing " + project.title() + "...");
-        appendLog("Installing mod " + project.title() + " (" + project.fileName() + ") into " + modsDirectory + ".");
-        Path minecraftDirectory = modsDirectory.getParent();
-        executor.execute(() -> {
-            try {
-                Path installed = modrinthModService.install(project, minecraftDirectory, message ->
-                        Platform.runLater(() -> {
-                            browseStatus.setText(message);
-                            appendLog(message);
-                        }));
-                Platform.runLater(() -> {
-                    browseStatus.setText(project.title() + " installed to " + installed + ".");
-                    appendLog("Installed mod " + installed + ".");
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    browseStatus.setText("Could not install " + project.title() + ": " + e.getMessage());
-                    appendLog("Mod install failed for " + project.title() + ": " + e.getMessage());
-                    showError("Could not install " + project.title(), e);
-                });
-            } finally {
-                modsDownloading.remove(project.fileName());
-                Platform.runLater(() -> {
-                    results.refresh();
-                    refreshInstalled.run();
-                });
-            }
-        });
-    }
-
-    private void loadInstalledMods(Path modsDirectory, ListView<Path> installedList, Label installedStatus) {
-        installedStatus.setText("Scanning mods folder...");
-        executor.execute(() -> {
-            List<Path> mods = new ArrayList<>();
-            String error = null;
-            if (Files.isDirectory(modsDirectory)) {
-                try (var files = Files.list(modsDirectory)) {
-                    files.filter(Files::isRegularFile)
-                            .filter(file -> {
-                                String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
-                                return name.endsWith(".jar") || name.endsWith(".jar.disabled");
-                            })
-                            .sorted(java.util.Comparator.comparing(file -> file.getFileName().toString().toLowerCase(java.util.Locale.ROOT)))
-                            .forEach(mods::add);
-                } catch (IOException e) {
-                    error = e.getMessage();
-                }
-            }
-            String scanError = error;
-            Platform.runLater(() -> {
-                installedList.getItems().setAll(mods);
-                if (scanError != null) installedStatus.setText("Could not read the mods folder: " + scanError);
-                else if (!Files.isDirectory(modsDirectory)) installedStatus.setText("No mods folder yet. It will be created on your first install.");
-                else installedStatus.setText(mods.size() + (mods.size() == 1 ? " mod installed." : " mods installed."));
-            });
-        });
-    }
-
-    private void removeSelectedMod(Path modsDirectory, ListView<Path> installedList, Runnable refreshInstalled) {
-        Path selected = installedList.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            showError("Select a mod", new IOException("Choose an installed mod to remove."));
-            return;
-        }
-        Path file = selected.toAbsolutePath().normalize();
-        if (!modsDirectory.equals(file.getParent())) {
-            showError("Could not remove mod", new IOException("That file is not inside V-Client's mods folder."));
-            return;
-        }
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
-                "Remove " + file.getFileName() + " from your mods folder?", ButtonType.OK, ButtonType.CANCEL);
-        confirm.initOwner(stage);
-        confirm.setTitle("V-Client");
-        confirm.setHeaderText("Remove mod");
-        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
-        try {
-            Files.deleteIfExists(file);
-            appendLog("Removed mod " + file + ".");
-        } catch (IOException e) {
-            showError("Could not remove mod", e);
-        }
-        refreshInstalled.run();
     }
 
     private static Image modIcon(String iconUrl) {
         try {
             URI uri = URI.create(iconUrl);
             if (!"https".equalsIgnoreCase(uri.getScheme()) || !"cdn.modrinth.com".equalsIgnoreCase(uri.getHost())) return null;
-            return new Image(uri.toString(), 42, 42, true, true, true);
+            return new Image(uri.toString(), 112, 112, true, true, true);
         } catch (IllegalArgumentException e) {
             return null;
         }
@@ -1894,18 +2006,36 @@ public final class LauncherApp extends Application {
         layout.setTop(header);
         VBox navigation = new VBox(3);
         navigation.setAlignment(Pos.TOP_CENTER);
-        navigation.setPadding(new Insets(10, 5, 10, 5));
-        navigation.setPrefWidth(88);
+        navigation.setPadding(new Insets(12, 6, 12, 6));
+        navigation.setSpacing(4);
+        navigation.setPrefWidth(92);
         navigation.setStyle("-fx-background-color: rgba(9, 10, 27, 0.68); -fx-border-color: transparent rgba(145, 127, 186, 0.18) transparent transparent;");
         for (Page page : Page.values()) {
-            if (page == Page.MODS) continue; // The Mods page stays in the code but has no sidebar button.
-            Button item = button(navigationText(page), "transparent", 10);
-            item.setMinWidth(76);
-            item.setPrefWidth(76);
-            item.setMinHeight(44);
-            item.setMaxHeight(44);
-            item.setWrapText(true);
+            String[] parts = navigationText(page).split("\n", 2);
+            Label glyph = new Label(parts[0]);
+            glyph.setMinSize(32, 24);
+            glyph.setPrefSize(32, 24);
+            glyph.setMaxSize(32, 24);
+            glyph.setAlignment(Pos.CENTER);
+            Label caption = new Label(parts.length > 1 ? parts[1] : "");
+            caption.setAlignment(Pos.CENTER);
+            VBox stack = new VBox(3, glyph, caption);
+            stack.setAlignment(Pos.CENTER);
+            Button item = new Button();
+            item.setGraphic(stack);
+            item.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
+            item.setMinSize(78, 54);
+            item.setPrefSize(78, 54);
+            item.setMaxSize(78, 54);
             item.setOnAction(event -> navigate(page));
+            item.setOnMouseEntered(event -> {
+                hoveredPage = page;
+                updateNavigationState();
+            });
+            item.setOnMouseExited(event -> {
+                if (hoveredPage == page) hoveredPage = null;
+                updateNavigationState();
+            });
             navigationButtons.put(page, item);
             navigation.getChildren().add(item);
         }
@@ -1935,10 +2065,17 @@ public final class LauncherApp extends Application {
     private void updateNavigationState() {
         navigationButtons.forEach((page, item) -> {
             boolean selected = page == activePage;
-            item.setStyle("-fx-background-color: " + (selected ? "rgba(230, 189, 89, 0.20)" : "transparent")
-                    + "; -fx-text-fill: " + (selected ? ACCENT : MUTED)
-                    + "; -fx-font-size: 10px; -fx-font-weight: bold; -fx-background-radius: 12;"
-                    + " -fx-padding: 5 2 5 2; -fx-cursor: hand;");
+            boolean hovered = page == hoveredPage;
+            String color = selected ? ACCENT : hovered ? "#f5f7fd" : "#a9a9cc";
+            item.setStyle("-fx-background-color: " + (selected ? "rgba(230, 189, 89, 0.17)"
+                    : hovered ? "rgba(255, 255, 255, 0.07)" : "transparent")
+                    + "; -fx-background-radius: 14; -fx-border-radius: 14; -fx-padding: 0; -fx-cursor: hand;"
+                    + " -fx-border-color: " + (selected ? "rgba(230, 189, 89, 0.55)" : "transparent") + "; -fx-border-width: 1;");
+            if (item.getGraphic() instanceof VBox stack && stack.getChildren().size() == 2) {
+                stack.getChildren().get(0).setStyle("-fx-font-size: 17px; -fx-font-family: 'Segoe UI Symbol', 'Segoe UI';"
+                        + " -fx-text-fill: " + color + ";");
+                stack.getChildren().get(1).setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: " + color + ";");
+            }
         });
     }
 
