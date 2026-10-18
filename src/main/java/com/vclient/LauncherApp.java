@@ -2006,8 +2006,8 @@ public final class LauncherApp extends Application {
         layout.setTop(header);
         VBox navigation = new VBox(3);
         navigation.setAlignment(Pos.TOP_CENTER);
-        navigation.setPadding(new Insets(12, 6, 12, 6));
-        navigation.setSpacing(4);
+        navigation.setPadding(new Insets(10, 6, 10, 6));
+        navigation.setSpacing(3);
         navigation.setPrefWidth(92);
         navigation.setStyle("-fx-background-color: rgba(9, 10, 27, 0.68); -fx-border-color: transparent rgba(145, 127, 186, 0.18) transparent transparent;");
         for (Page page : Page.values()) {
@@ -2024,9 +2024,9 @@ public final class LauncherApp extends Application {
             Button item = new Button();
             item.setGraphic(stack);
             item.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
-            item.setMinSize(78, 54);
-            item.setPrefSize(78, 54);
-            item.setMaxSize(78, 54);
+            item.setMinSize(78, 50);
+            item.setPrefSize(78, 50);
+            item.setMaxSize(78, 50);
             item.setOnAction(event -> navigate(page));
             item.setOnMouseEntered(event -> {
                 hoveredPage = page;
@@ -2039,7 +2039,18 @@ public final class LauncherApp extends Application {
             navigationButtons.put(page, item);
             navigation.getChildren().add(item);
         }
-        layout.setLeft(navigation);
+        // In a short window the sidebar scrolls instead of pushing the whole layout past the window edges
+        // (the root centres its content, so an over-tall sidebar used to clip the header and the last items).
+        javafx.scene.control.ScrollPane navigationScroll = new javafx.scene.control.ScrollPane(navigation);
+        navigationScroll.setFitToWidth(true);
+        navigationScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        navigationScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        navigationScroll.setMinHeight(0);
+        navigationScroll.setPrefWidth(100);
+        navigationScroll.setMinWidth(100);
+        navigationScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-padding: 0;");
+        layout.setMinSize(0, 0);
+        layout.setLeft(navigationScroll);
         updateNavigationState();
         root.getChildren().add(layout);
         return root;
