@@ -639,12 +639,30 @@ public final class LauncherApp extends Application {
             memory.setSnapToTicks(true);
             memory.setShowTickMarks(true);
             memory.setStyle("-fx-control-inner-background: " + ACCENT + "; -fx-accent: " + ACCENT + ";");
+            long ramGb = BoostProfile.physicalRamBytes() / (1024L * 1024 * 1024);
+            Label warning = ModsUi.text("", 11, ModsUi.WARNING, false);
+            warning.setWrapText(true);
+            Runnable checkRam = () -> warning.setText(settings.memoryGb() > ramGb * 3 / 4
+                    ? "This PC has about " + ramGb + " GB of RAM. Giving the game this much can slow Windows and the game down; "
+                    + "leave at least a quarter for the system." : "");
             memory.valueProperty().addListener((observable, oldValue, newValue) -> {
                 settings.setMemoryGb(newValue.intValue());
                 value.setText(newValue.intValue() + " GB");
+                checkRam.run();
                 saveSettings();
             });
-            card.getChildren().addAll(heading, memory);
+            HBox presets = new HBox(8);
+            for (int preset : List.of(2, 4, 6, 8, 12, 16, 24, 32)) {
+                if (preset > LauncherSettings.maxMemory()) continue;
+                Button choice = new Button(preset + " GB");
+                choice.setMinHeight(32);
+                choice.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-text-fill: #f5f7fd; -fx-font-size: 11px;"
+                        + " -fx-font-weight: bold; -fx-background-radius: 10; -fx-padding: 0 14 0 14; -fx-cursor: hand;");
+                choice.setOnAction(event -> memory.setValue(preset));
+                presets.getChildren().add(choice);
+            }
+            checkRam.run();
+            card.getChildren().addAll(heading, memory, presets, warning);
             return card;
         }
 

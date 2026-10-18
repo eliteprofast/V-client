@@ -255,8 +255,11 @@ final class LauncherSettings {
         return isAdmin(account) && hackerSelected(account);
     }
 
+    /** The most game memory the sliders offer. It used to follow the launcher's own heap (9 GB here). */
+    static final int MAX_MEMORY_GB = 32;
+
     static int maxMemory() {
-        return Math.max(4, (int) (Runtime.getRuntime().maxMemory() / (1024 * 1024 * 1024)) + 2);
+        return MAX_MEMORY_GB;
     }
 
     private static int defaultMemory() {
