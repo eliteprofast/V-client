@@ -230,7 +230,7 @@ public final class SkinFix {
         }
         opaque(image, 0, 0, 32, 16);
         opaque(image, 0, 16, 64, 16);
-        opaque(image, 16, 48, 48, 16);
+        opaque(image, 16, 48, 32, 16);
         return image;
     }
 
