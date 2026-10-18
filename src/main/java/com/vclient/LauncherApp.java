@@ -271,7 +271,7 @@ public final class LauncherApp extends Application {
         log.setStyle("-fx-control-inner-background: rgba(9, 10, 28, 0.82); -fx-text-fill: #c3bfdc; -fx-font-family: 'Consolas'; -fx-font-size: 11px; -fx-background-color: rgba(9, 10, 28, 0.82); -fx-border-color: #37334f; -fx-border-radius: 8; -fx-background-radius: 8;");
         log.setText(String.join(System.lineSeparator(), logLines));
         VBox.setVgrow(log, Priority.ALWAYS);
-        content.getChildren().addAll(heading, homeAnnouncements, homeStatusRow, versionCard, launchRow, statusRow, logTitle, log);
+        content.getChildren().addAll(heading, launchEventBanner(), homeAnnouncements, homeStatusRow, versionCard, launchRow, statusRow, logTitle, log);
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
         refreshVersions(selectedVersionId);
@@ -1597,6 +1597,25 @@ public final class LauncherApp extends Application {
     }
 
     /** A box that fills itself with active announcements; stays empty when the backend is unavailable. */
+    private static final java.time.LocalDate LAUNCH_DATE = java.time.LocalDate.of(2026, 11, 10);
+
+    /** The built-in launch-event notice: always shown, needs no backend. */
+    private VBox launchEventBanner() {
+        long days = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), LAUNCH_DATE);
+        String countdown = days > 1 ? days + " DAYS TO GO" : days == 1 ? "TOMORROW" : days == 0 ? "TODAY" : "LIVE NOW";
+        Label tag = label("NEWS  ·  EVENT  ·  " + countdown, 10, "#ff8fd8");
+        tag.setStyle(tag.getStyle() + "-fx-font-weight: bold; -fx-letter-spacing: 2;");
+        Label headline = label("EVENT! We are launching V-Client on the 10th of November 2026", 16, "#f3f6fc");
+        headline.setStyle(headline.getStyle() + "-fx-font-weight: bold;");
+        headline.setWrapText(true);
+        Label detail = label("Exclusive launch-event capes, wings, hats, trails and emotes unlock that day in the Cosmetics menu.", 12, "#c9d3e6");
+        detail.setWrapText(true);
+        VBox box = new VBox(6, tag, headline, detail);
+        box.setPadding(new Insets(16, 20, 16, 20));
+        box.setStyle("-fx-background-color: linear-gradient(to right, rgba(120, 40, 110, 0.55), rgba(40, 30, 90, 0.7)); -fx-background-radius: 12; -fx-border-color: rgba(255, 143, 216, 0.55); -fx-border-radius: 12;");
+        return box;
+    }
+
     private VBox announcementBox() {
         VBox box = new VBox(8);
         BackendClient client = backend();
@@ -1688,7 +1707,7 @@ public final class LauncherApp extends Application {
             posts.getChildren().add(label("Set the V-Client backend address below to load news.", 12, MUTED));
         }
 
-        content.getChildren().addAll(announcementBox(), statusCard, posts, accountCard(root), backendCard());
+        content.getChildren().addAll(launchEventBanner(), announcementBox(), statusCard, posts, accountCard(root), backendCard());
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
     }
