@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>V-Client Grants</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    main { max-width: 760px; margin: 40px auto; padding: 0 16px; }
+    .panel { background: rgba(15,16,39,.85); border: 1px solid rgba(170,151,207,.25); border-radius: 12px; padding: 20px; margin-bottom: 18px; }
+    label { display: block; margin: 10px 0 4px; font-size: 12px; opacity: .8; }
+    input, select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #48415f; background: #14142d; color: #f3f0ff; font-size: 14px; box-sizing: border-box; }
+    button { margin-top: 12px; margin-right: 8px; padding: 10px 16px; border: 0; border-radius: 8px; background: #e6bd59; color: #101321; font-weight: bold; cursor: pointer; }
+    button.alt { background: #292642; color: #f3f0ff; }
+    #message { min-height: 22px; margin: 8px 0; }
+    .ok { color: #6fd39b; } .bad { color: #ff9aa5; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; } td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,.08); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>V-Client Grant Tool</h1>
+    <p>Admin only. Unlock cosmetics for players or hand out invite rewards.</p>
+    <div id="message" role="status"></div>
+
+    <section class="panel" id="login">
+      <h2>Sign in</h2>
+      <label for="user">Admin username</label><input id="user" autocomplete="username">
+      <label for="pass">Password</label><input id="pass" type="password" autocomplete="current-password">
+      <button id="signin" type="button">Sign in</button>
+    </section>
+
+    <div id="tools" hidden>
+      <section class="panel">
+        <h2>Player</h2>
+        <label for="player">Ely.by name or Minecraft UUID</label><input id="player" placeholder="e.g. SomePlayer" autocomplete="off">
+        <button id="show" type="button" class="alt">Show what they own</button>
+        <div id="owned"></div>
+      </section>
+      <section class="panel">
+        <h2>Unlock one cosmetic</h2>
+        <label for="cosmetic">Cosmetic</label><select id="cosmetic"></select>
+        <button id="grant" type="button">Unlock</button><button id="revoke" type="button" class="alt">Take away</button>
+      </section>
+      <section class="panel">
+        <h2>Invite reward</h2>
+        <label for="invites">How many players did they invite?</label>
+        <select id="invites"></select>
+        <button id="reward" type="button">Give reward and everything below it</button>
+        <table id="ladder"></table>
+      </section>
+    </div>
+  </main>
+  <script src="grants.js"></script>
+</body>
+</html>

@@ -105,11 +105,26 @@ function openDatabase(dataDir) {
     );
     CREATE TABLE IF NOT EXISTS cosmetic_grants (
       player_uuid TEXT NOT NULL,
-      cosmetic_id TEXT NOT NULL REFERENCES cosmetics(id) ON DELETE CASCADE,
+      cosmetic_id TEXT NOT NULL,
       granted_at INTEGER NOT NULL,
       PRIMARY KEY (player_uuid, cosmetic_id)
     );
   `);
+  // Older databases tied grants to rows in the cosmetics table; built-in cosmetics have no row, so drop that link.
+  const grants = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'cosmetic_grants'").get();
+  if (grants && /REFERENCES/i.test(grants.sql)) {
+    db.exec(`
+      ALTER TABLE cosmetic_grants RENAME TO cosmetic_grants_old;
+      CREATE TABLE cosmetic_grants (
+        player_uuid TEXT NOT NULL,
+        cosmetic_id TEXT NOT NULL,
+        granted_at INTEGER NOT NULL,
+        PRIMARY KEY (player_uuid, cosmetic_id)
+      );
+      INSERT INTO cosmetic_grants SELECT player_uuid, cosmetic_id, granted_at FROM cosmetic_grants_old;
+      DROP TABLE cosmetic_grants_old;
+    `);
+  }
   return db;
 }
 

@@ -208,9 +208,16 @@ test('cosmetics: admin publishes an item with an asset, players download it, pre
 
   const uuid = '1331c81d33844eb6baf6a511c8298af3';
   assert.deepEqual((await call('GET', `/api/cosmetics/owned/${uuid}`)).json.owned, []);
-  assert.equal((await call('POST', '/api/admin/cosmetics/grants', { token: admin, body: { uuid, cosmeticId: 'nope' } })).status, 404);
+  assert.equal((await call('POST', '/api/admin/cosmetics/grants', { token: admin, body: { uuid, cosmeticId: 'Not Valid!' } })).status, 400);
   assert.equal((await call('POST', '/api/admin/cosmetics/grants', { token: admin, body: { uuid, cosmeticId: 'royal_cape' } })).status, 201);
   assert.deepEqual((await call('GET', `/api/cosmetics/owned/${uuid}`)).json.owned, ['royal_cape']);
+  const tier = await call('POST', '/api/admin/cosmetics/grants', { token: admin, body: { player: uuid, invites: 10 } });
+  assert.equal(tier.status, 201);
+  assert.deepEqual(tier.json.granted, ['ice_cape', 'lava_cape', 'neon_cape']);
+  assert.deepEqual((await call('GET', `/api/cosmetics/owned/${uuid}`)).json.owned.sort(),
+    ['ice_cape', 'lava_cape', 'neon_cape', 'royal_cape']);
+  assert.equal((await call('POST', '/api/admin/cosmetics/grants', { token: admin, body: { player: '!!', invites: 5 } })).status, 400);
+  assert.equal((await call('GET', '/api/admin/cosmetics/rewards', { token: admin })).json.items.length, 7);
   assert.equal((await call('GET', '/api/cosmetics/owned/not-a-uuid')).status, 400);
 
   // Replacing the asset bumps the item version so clients download it again.

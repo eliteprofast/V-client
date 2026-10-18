@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const { requireAdmin } = require('./auth');
+const { INVITE_REWARDS, rewardsFor } = require('../rewards');
 
 const SCHEMA = 1;
 const CATEGORIES = ['cape', 'wings', 'hat', 'emote', 'animated', 'trail'];
@@ -188,14 +189,45 @@ cosmeticsRoutes.admin = (ctx) => {
     res.json({ items: rows.map((r) => ({ uuid: r.player_uuid, cosmeticId: r.cosmetic_id, grantedAt: new Date(r.granted_at * 1000).toISOString() })) });
   });
 
-  router.post('/grants', (req, res) => {
-    const uuid = String(req.body?.uuid || '').replace(/-/g, '').toLowerCase();
-    const cosmeticId = String(req.body?.cosmeticId || '');
-    if (!PLAYER_UUID.test(uuid)) return res.status(400).json({ error: 'uuid must be a Minecraft UUID' });
-    if (!db.prepare('SELECT 1 FROM cosmetics WHERE id = ?').get(cosmeticId)) return res.status(404).json({ error: 'Cosmetic not found' });
-    db.prepare('INSERT OR IGNORE INTO cosmetic_grants (player_uuid, cosmetic_id, granted_at) VALUES (?, ?, ?)')
-      .run(uuid, cosmeticId, now());
-    return res.status(201).json({ uuid, cosmeticId });
+  /** A player is a 32-hex UUID, or an Ely.by name that is looked up. Returns the UUID or null. */
+  async function resolvePlayer(value) {
+    const text = String(value || '').trim();
+    const compact = text.replace(/-/g, '').toLowerCase();
+    if (PLAYER_UUID.test(compact)) return compact;
+    if (!/^[A-Za-z0-9_]{3,16}$/.test(text)) return null;
+    try {
+      const response = await fetch('https://authserver.ely.by/api/users/profiles/minecraft/' + encodeURIComponent(text),
+        { signal: AbortSignal.timeout(8000) });
+      if (!response.ok) return null;
+      const id = String((await response.json()).id || '').replace(/-/g, '').toLowerCase();
+      return PLAYER_UUID.test(id) ? id : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const grant = (uuid, cosmeticId) => db.prepare(
+    'INSERT OR IGNORE INTO cosmetic_grants (player_uuid, cosmetic_id, granted_at) VALUES (?, ?, ?)').run(uuid, cosmeticId, now());
+
+  router.get('/rewards', (req, res) => res.json({ items: INVITE_REWARDS }));
+
+  // Grants one cosmetic (cosmeticId) or an invite-reward tier (invites: N). The player is a UUID or Ely.by name.
+  // Ids need not be in the database: the built-in catalog ships inside the mod.
+  router.post('/grants', async (req, res) => {
+    const uuid = await resolvePlayer(req.body?.player ?? req.body?.uuid);
+    if (!uuid) return res.status(400).json({ error: 'Unknown player: enter an Ely.by name or a Minecraft UUID' });
+    let ids;
+    if (req.body?.invites !== undefined) {
+      const invites = Number(req.body.invites);
+      if (!Number.isInteger(invites) || invites < 0 || invites > 100000) return res.status(400).json({ error: 'invites must be a whole number' });
+      ids = rewardsFor(invites);
+    } else {
+      const cosmeticId = String(req.body?.cosmeticId || '');
+      if (!ID.test(cosmeticId)) return res.status(400).json({ error: 'cosmeticId is required' });
+      ids = [cosmeticId];
+    }
+    ids.forEach((id) => grant(uuid, id));
+    return res.status(201).json({ uuid, granted: ids, cosmeticId: ids[0] });
   });
 
   router.delete('/grants', (req, res) => {

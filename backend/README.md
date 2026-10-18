@@ -91,3 +91,12 @@ curl -X POST $B/api/admin/announcements -H "$AUTH" -H "Content-Type: application
 ## Privacy
 
 Usage counters contain a random install id, platform, launcher version and an event name (`launch`, `play`, `join`, `update`). No IP addresses, hardware ids or account names are stored with them.
+
+## Grant tool and invite rewards
+
+Open `/grants.html` on the backend (for example `https://vsmp-client-backend.onrender.com/grants.html`), sign in with the
+admin account, then enter an Ely.by name or UUID to unlock one cosmetic, take it away, or give an invite reward.
+The API is `POST /api/admin/cosmetics/grants` with `{ "player": "<name or uuid>", "cosmeticId": "ice_cape" }` or
+`{ "player": "<name or uuid>", "invites": 10 }`; `GET /api/admin/cosmetics/rewards` lists the ladder.
+Tiers (5, 8, 10, 12, 15, 17, 20 invites) live in `src/rewards.js`. On the free Render plan grants are lost on every
+restart, so use a persistent disk or database before relying on them.

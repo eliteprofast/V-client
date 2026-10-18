@@ -4,7 +4,7 @@
     {
       "id": "ramadan_cape",
       "category": "cape",
-      "tier": "free",
+      "tier": "premium",
       "name": "Ramadan Kareem",
       "sort": 5,
       "description": "A golden crescent and star over a night-to-emerald sky, with hanging lanterns and an Islamic geometric lattice.",
@@ -21,7 +21,7 @@
     {
       "id": "ramadan_lanterns",
       "category": "animated",
-      "tier": "free",
+      "tier": "premium",
       "name": "Ramadan Lanterns",
       "sort": 6,
       "description": "The Ramadan cape alive: flickering lanterns, a breathing crescent, twinkling stars, a sweeping shimmer on the gold frame and rising gold dust.",
@@ -63,7 +63,7 @@
     {
       "id": "gold_stripes",
       "category": "cape",
-      "tier": "free",
+      "tier": "premium",
       "name": "Gold Stripes",
       "sort": 11,
       "description": "Bold gold stripes on midnight blue.",
@@ -85,7 +85,7 @@
     {
       "id": "emerald",
       "category": "cape",
-      "tier": "free",
+      "tier": "premium",
       "name": "Emerald",
       "sort": 12,
       "description": "Deep green fading to bright emerald.",
@@ -109,7 +109,7 @@
       "tier": "premium",
       "name": "Royal Cape",
       "sort": 13,
-      "description": "A velvet cape fit for the VSMP court. Premium.",
+      "description": "A velvet cape fit for the VSMP court.",
       "definition": {
         "texture": {
           "width": 64,
@@ -149,7 +149,7 @@
     {
       "id": "starfield_cape",
       "category": "animated",
-      "tier": "free",
+      "tier": "premium",
       "name": "Starfield",
       "sort": 21,
       "description": "A purple-blue nebula with twinkling stars of three sizes and a shooting star on every loop.",
@@ -170,7 +170,7 @@
     {
       "id": "halo_spin",
       "category": "animated",
-      "tier": "free",
+      "tier": "premium",
       "name": "Spinning Halo",
       "sort": 22,
       "description": "A golden halo that slowly turns above your head.",
@@ -404,7 +404,7 @@
     {
       "id": "dragon_wings",
       "category": "wings",
-      "tier": "free",
+      "tier": "premium",
       "name": "Dragon Wings",
       "sort": 31,
       "description": "Dark leathery wings with a slow beat.",
@@ -711,7 +711,7 @@
     {
       "id": "top_hat",
       "category": "hat",
-      "tier": "free",
+      "tier": "premium",
       "name": "Top Hat",
       "sort": 41,
       "description": "Dapper.",
@@ -778,7 +778,7 @@
     {
       "id": "cat_ears",
       "category": "hat",
-      "tier": "free",
+      "tier": "premium",
       "name": "Cat Ears",
       "sort": 42,
       "description": "Two pointy ears.",
@@ -877,7 +877,7 @@
     {
       "id": "wizard_hat",
       "category": "hat",
-      "tier": "free",
+      "tier": "premium",
       "name": "Wizard Hat",
       "sort": 43,
       "description": "A tall purple hat with a brim.",
@@ -1006,7 +1006,7 @@
     {
       "id": "hearts_trail",
       "category": "trail",
-      "tier": "free",
+      "tier": "premium",
       "name": "Hearts",
       "sort": 51,
       "description": "Hearts float up around you.",
@@ -1031,7 +1031,7 @@
     {
       "id": "ember_trail",
       "category": "trail",
-      "tier": "free",
+      "tier": "premium",
       "name": "Embers",
       "sort": 52,
       "description": "Small flames while you move.",
@@ -1062,7 +1062,7 @@
     {
       "id": "gold_dust_trail",
       "category": "trail",
-      "tier": "free",
+      "tier": "premium",
       "name": "Gold Dust",
       "sort": 53,
       "description": "A fine gold dust shimmer.",
@@ -1092,7 +1092,7 @@
       "tier": "premium",
       "name": "Soul Fire",
       "sort": 54,
-      "description": "Cold blue flames at your feet. Premium.",
+      "description": "Cold blue flames at your feet.",
       "definition": {
         "trail": {
           "particle": "minecraft:soul_fire_flame",
@@ -1223,7 +1223,7 @@
     {
       "id": "dance",
       "category": "emote",
-      "tier": "free",
+      "tier": "premium",
       "name": "Dance",
       "sort": 61,
       "description": "A loop. Moving or pressing the emote key stops it.",
@@ -1386,7 +1386,7 @@
     {
       "id": "clap",
       "category": "emote",
-      "tier": "free",
+      "tier": "premium",
       "name": "Clap",
       "sort": 62,
       "description": "Applause.",
@@ -1551,7 +1551,7 @@
     {
       "id": "salute",
       "category": "emote",
-      "tier": "free",
+      "tier": "premium",
       "name": "Salute",
       "sort": 63,
       "description": "A crisp salute.",
@@ -1660,7 +1660,7 @@
     {
       "id": "sunset_cape",
       "category": "cape",
-      "tier": "free",
+      "tier": "premium",
       "name": "Sunset",
       "sort": 102,
       "description": "Orange to purple evening sky.",
@@ -1682,7 +1682,7 @@
     {
       "id": "ocean_cape",
       "category": "cape",
-      "tier": "free",
+      "tier": "premium",
       "name": "Ocean",
       "sort": 103,
       "description": "Deep blue to aqua.",
@@ -1748,7 +1748,7 @@
     {
       "id": "rose_cape",
       "category": "cape",
-      "tier": "free",
+      "tier": "premium",
       "name": "Rose",
       "sort": 106,
       "description": "Pink to deep rose.",
@@ -1770,7 +1770,7 @@
     {
       "id": "checker_cape",
       "category": "cape",
-      "tier": "free",
+      "tier": "premium",
       "name": "Checkerboard",
       "sort": 107,
       "description": "Black and white checks.",
@@ -1888,7 +1888,7 @@
     {
       "id": "ice_flow",
       "category": "animated",
-      "tier": "free",
+      "tier": "premium",
       "name": "Frost Wave",
       "sort": 112,
       "description": "A cold wave rolling over ice.",
@@ -1938,7 +1938,7 @@
     {
       "id": "emerald_wave",
       "category": "animated",
-      "tier": "free",
+      "tier": "premium",
       "name": "Emerald Wave",
       "sort": 114,
       "description": "Green light flowing down the cape.",
@@ -2263,7 +2263,7 @@
     {
       "id": "bat_wings",
       "category": "wings",
-      "tier": "free",
+      "tier": "premium",
       "name": "Bat Wings",
       "sort": 118,
       "description": "Dark leathery bat wings.",
@@ -2391,7 +2391,7 @@
     {
       "id": "butterfly_wings",
       "category": "wings",
-      "tier": "free",
+      "tier": "premium",
       "name": "Butterfly Wings",
       "sort": 119,
       "description": "Pink and blue butterfly wings.",
@@ -3025,7 +3025,7 @@
     {
       "id": "party_hat",
       "category": "hat",
-      "tier": "free",
+      "tier": "premium",
       "name": "Party Hat",
       "sort": 124,
       "description": "Cone-shaped party hat.",
@@ -3262,7 +3262,7 @@
     {
       "id": "horns",
       "category": "hat",
-      "tier": "free",
+      "tier": "premium",
       "name": "Devil Horns",
       "sort": 126,
       "description": "Two little red horns.",
@@ -3361,7 +3361,7 @@
     {
       "id": "bunny_ears",
       "category": "hat",
-      "tier": "free",
+      "tier": "premium",
       "name": "Bunny Ears",
       "sort": 127,
       "description": "Long floppy ears.",
@@ -3435,7 +3435,7 @@
     {
       "id": "fez",
       "category": "hat",
-      "tier": "free",
+      "tier": "premium",
       "name": "Fez",
       "sort": 128,
       "description": "A red fez with a tassel.",
@@ -3828,7 +3828,7 @@
     {
       "id": "flame_trail",
       "category": "trail",
-      "tier": "free",
+      "tier": "premium",
       "name": "Flames",
       "sort": 133,
       "description": "A line of fire.",
@@ -3858,7 +3858,7 @@
     {
       "id": "music_trail",
       "category": "trail",
-      "tier": "free",
+      "tier": "premium",
       "name": "Music Notes",
       "sort": 134,
       "description": "Notes float up behind you.",
@@ -3918,7 +3918,7 @@
     {
       "id": "cloud_trail",
       "category": "trail",
-      "tier": "free",
+      "tier": "premium",
       "name": "Clouds",
       "sort": 136,
       "description": "Puffs of cloud.",
@@ -4009,7 +4009,7 @@
     {
       "id": "cheer",
       "category": "emote",
-      "tier": "free",
+      "tier": "premium",
       "name": "Cheer",
       "sort": 139,
       "description": "Both arms up.",
@@ -4126,7 +4126,7 @@
     {
       "id": "bow",
       "category": "emote",
-      "tier": "free",
+      "tier": "premium",
       "name": "Bow",
       "sort": 140,
       "description": "A polite bow.",
@@ -4189,7 +4189,7 @@
     {
       "id": "flex",
       "category": "emote",
-      "tier": "free",
+      "tier": "premium",
       "name": "Flex",
       "sort": 141,
       "description": "Show off.",
@@ -4509,7 +4509,7 @@
     {
       "id": "sit_emote",
       "category": "emote",
-      "tier": "free",
+      "tier": "premium",
       "name": "Sit",
       "sort": 144,
       "description": "Sit down for a bit.",
