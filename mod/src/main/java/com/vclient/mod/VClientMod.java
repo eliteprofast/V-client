@@ -51,7 +51,7 @@ public final class VClientMod implements ClientModInitializer {
         com.vclient.mod.cosmetics.Cosmetics.init();
         if (CHEATS_REQUESTED && cheatsAllowed()) {
             VConfig.setEnabled(Module.FREECAM, false);
-            LOGGER.info("Hacker mode unlocked: X-Ray, Reach-Hits, Speed Hack and Freecam are available.");
+            LOGGER.info("Hacker mode unlocked: X-Ray, Reach-Hits, Speed Hack, Freecam, Fly, Auto Sprint, Step, Spider, High Jump, Fast Place, Glow ESP and Hitboxes are available.");
         }
         LOGGER.info("V-Client mod loaded. Press {} in game to open the mod menu.",
                 KeyNames.name(VConfig.integer(Module.CLIENT, "menuKey")));
@@ -139,10 +139,83 @@ public final class VClientMod implements ClientModInitializer {
         if (client.player == null) return;
         if (freecamOn) {
             tickFreecam(client);
+        } else if (VConfig.enabled(Module.FLY) && !client.player.hasVehicle()) {
+            tickFly(client);
         } else if (VConfig.enabled(Module.SPEED_HACK) && !client.player.hasVehicle()
                 && !client.player.isSneaking()) {
             tickSpeedHack(client);
         }
+        if (!freecamOn) tickMovementExtras(client);
+        if (VConfig.enabled(Module.FAST_PLACE)) {
+            ((com.vclient.mod.mixin.MinecraftClientAccessor) client).vclient$setItemUseCooldown(0);
+        }
+    }
+
+    private static boolean wasOnGround;
+    private static int flyTicks;
+
+    /** Creative-style flight: hold jump to rise, sneak to sink, otherwise hover in place. */
+    private static void tickFly(MinecraftClient client) {
+        var player = client.player;
+        if (client.currentScreen != null) return;
+        double speed = 0.4 * VConfig.get(Module.FLY, "speed");
+        double forward = axis(client.options.forwardKey.isPressed(), client.options.backKey.isPressed());
+        double strafe = axis(client.options.rightKey.isPressed(), client.options.leftKey.isPressed());
+        double yaw = Math.toRadians(player.getYaw());
+        double dx = forward * -Math.sin(yaw) + strafe * -Math.cos(yaw);
+        double dz = forward * Math.cos(yaw) + strafe * -Math.sin(yaw);
+        double length = Math.sqrt(dx * dx + dz * dz);
+        if (length > 0) {
+            dx = dx / length * speed;
+            dz = dz / length * speed;
+        }
+        double dy = axis(client.options.jumpKey.isPressed(), client.options.sneakKey.isPressed()) * speed;
+        // Servers kick players who hover without moving for about four seconds; a tiny alternating drop avoids that.
+        flyTicks++;
+        if (dy == 0 && VConfig.bool(Module.FLY, "hover")) dy = flyTicks % 40 == 0 ? -0.04 : flyTicks % 40 == 20 ? 0.04 : 0;
+        player.setVelocity(dx, dy, dz);
+        player.fallDistance = 0;
+    }
+
+    /** Auto Sprint, Step, Spider and High Jump. */
+    private static void tickMovementExtras(MinecraftClient client) {
+        var player = client.player;
+        boolean forward = client.options.forwardKey.isPressed() && client.currentScreen == null;
+        if (VConfig.enabled(Module.AUTO_SPRINT) && forward && !player.isSneaking() && !player.isSprinting()
+                && player.getHungerManager().getFoodLevel() > 6) {
+            player.setSprinting(true);
+        }
+        if (VConfig.enabled(Module.STEP) && forward && player.horizontalCollision && player.isOnGround()) {
+            player.jump();
+        }
+        if (VConfig.enabled(Module.SPIDER) && forward && player.horizontalCollision && !player.isSneaking()) {
+            var velocity = player.getVelocity();
+            player.setVelocity(velocity.x, 0.2 * VConfig.get(Module.SPIDER, "speed"), velocity.z);
+            player.fallDistance = 0;
+        }
+        boolean onGround = player.isOnGround();
+        if (VConfig.enabled(Module.HIGH_JUMP) && wasOnGround && !onGround && client.options.jumpKey.isPressed()
+                && player.getVelocity().y > 0.25) {
+            var velocity = player.getVelocity();
+            player.setVelocity(velocity.x, 0.42 * VConfig.get(Module.HIGH_JUMP, "power"), velocity.z);
+        }
+        wasOnGround = onGround;
+    }
+
+    /** Glow ESP: whether this entity should get the glowing outline for the local player. */
+    public static boolean glowEsp(net.minecraft.entity.Entity entity) {
+        if (!VConfig.enabled(Module.GLOW_ESP)) return false;
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null || entity == client.player) return false;
+        if (entity instanceof net.minecraft.entity.player.PlayerEntity) return true;
+        return VConfig.bool(Module.GLOW_ESP, "mobs") && entity instanceof net.minecraft.entity.LivingEntity;
+    }
+
+    /** Hitboxes: extra size added to other living entities' targeting box. */
+    public static float hitboxMargin(net.minecraft.entity.Entity entity) {
+        if (!VConfig.enabled(Module.HITBOXES) || !(entity instanceof net.minecraft.entity.LivingEntity)) return 0;
+        MinecraftClient client = MinecraftClient.getInstance();
+        return client.player == null || entity == client.player ? 0 : (float) VConfig.get(Module.HITBOXES, "size");
     }
 
     private static void tickFreecam(MinecraftClient client) {

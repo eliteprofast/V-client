@@ -57,7 +57,21 @@ public enum Module {
     SPEED_HACK("Speed Hack", "Move faster", false, Kind.CHEAT,
             Setting.number("multiplier", "Speed", 2, 1, 10, 0.5, "x")),
     FREECAM("Freecam", "Fly the camera around", false, Kind.CHEAT,
-            Setting.number("speed", "Camera speed", 3, 1, 10, 1, "x"));
+            Setting.number("speed", "Camera speed", 3, 1, 10, 1, "x")),
+    FLY("Fly", "Fly like in creative", false, Kind.CHEAT,
+            Setting.number("speed", "Flight speed", 1.5, 0.5, 5, 0.5, "x"),
+            Setting.toggle("hover", "Anti-kick hover", true)),
+    AUTO_SPRINT("Auto Sprint", "Always sprint while moving", false, Kind.CHEAT),
+    STEP("Step", "Hop up blocks automatically", false, Kind.CHEAT),
+    SPIDER("Spider", "Climb walls", false, Kind.CHEAT,
+            Setting.number("speed", "Climb speed", 1, 0.5, 3, 0.5, "x")),
+    HIGH_JUMP("High Jump", "Jump much higher", false, Kind.CHEAT,
+            Setting.number("power", "Jump power", 2, 1.5, 5, 0.5, "x")),
+    FAST_PLACE("Fast Place", "No delay between placing blocks", false, Kind.CHEAT),
+    GLOW_ESP("Glow ESP", "Outline players through walls", false, Kind.CHEAT,
+            Setting.toggle("mobs", "Include mobs", false)),
+    HITBOXES("Hitboxes", "Bigger enemy hitboxes", false, Kind.CHEAT,
+            Setting.number("size", "Extra size", 0.2, 0.1, 1, 0.1, " blocks"));
 
     private enum Kind { ALWAYS_ON, FEATURE, HUD, CHEAT }
 

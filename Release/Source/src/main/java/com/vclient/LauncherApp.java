@@ -410,7 +410,7 @@ public final class LauncherApp extends Application {
                 : !settings.hackerSelected(account)
                 ? "Normal permissions: the Right Shift menu has the regular V-Client mods."
                 : settings.isAdmin(account)
-                ? "Hacker mode is active for " + account.name() + ": the Right Shift menu also has Fullbright, X-Ray, Reach-Hits, Speed hack and Freecam."
+                ? "Hacker mode is active for " + account.name() + ": the Right Shift menu also has X-Ray, Reach-Hits, Speed Hack, Freecam, Fly, Auto Sprint, Step, Spider, High Jump, Fast Place, Glow ESP and Hitboxes."
                 : "Only admin Ely.by accounts can use Hacker / Cheater. " + account.name() + " will play with normal permissions.");
         refreshHint.run();
         choice.valueProperty().addListener((observable, oldChoice, newChoice) -> {

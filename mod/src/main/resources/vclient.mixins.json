@@ -12,6 +12,7 @@
     "KeyboardInputMixin",
     "LivingEntityRendererAccess",
     "LightmapTextureManagerMixin",
+    "MinecraftClientAccessor",
     "MinecraftClientMixin",
     "MouseMixin",
     "PlayerEntityMixin",
