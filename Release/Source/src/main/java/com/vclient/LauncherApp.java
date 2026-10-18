@@ -1199,51 +1199,353 @@ public final class LauncherApp extends Application {
         settingsPage = false;
         updateNavigationState();
         StackPane root = baseLayout();
-        VBox content = pageContent("Local contacts", "Friends", "Keep a private list of Minecraft usernames on this device. No accounts or servers are contacted.");
-        HBox entry = new HBox(10);
-        entry.setAlignment(Pos.CENTER_LEFT);
-        TextField username = new TextField();
-        username.setPromptText("Minecraft username");
-        username.setStyle(fieldStyle());
-        HBox.setHgrow(username, Priority.ALWAYS);
-        Button add = button("ADD FRIEND", ACCENT, 10);
-        ListView<String> list = new ListView<>();
-        list.getItems().setAll(localFriends);
-        list.setPlaceholder(label("Your local friends list is empty.", 13, MUTED));
-        list.setStyle("-fx-control-inner-background: rgba(9, 10, 28, 0.82); -fx-background-color: transparent; -fx-border-color: rgba(170, 151, 207, 0.24);");
-        list.setPrefHeight(300);
-        Label statusText = label(localFriends.size() + " saved locally.", 11, MUTED);
-        add.setOnAction(event -> {
-            try {
-                localFriends.clear();
-                localFriends.addAll(friendsStore.add(username.getText()));
-                list.getItems().setAll(localFriends);
-                username.clear();
-                statusText.setText(localFriends.size() + " saved locally.");
-            } catch (IOException e) {
-                showError("Could not add friend", e);
-            }
-        });
-        entry.getChildren().addAll(username, add);
-        Button remove = button("REMOVE SELECTED", "#482332", 10);
-        remove.setOnAction(event -> {
-            String selected = list.getSelectionModel().getSelectedItem();
-            if (selected == null) {
-                showError("Select a friend", new IOException("Choose a username to remove."));
-                return;
-            }
-            try {
-                localFriends.clear();
-                localFriends.addAll(friendsStore.remove(selected));
-                list.getItems().setAll(localFriends);
-                statusText.setText(localFriends.size() + " saved locally.");
-            } catch (IOException e) {
-                showError("Could not remove friend", e);
-            }
-        });
-        content.getChildren().addAll(entry, list, remove, statusText);
+        VBox content = pageContent("Community", "Friends",
+                "Add friends by their V-Client username, see who is online and what they are playing. Needs a free V-Client account.");
+        FriendsPage page = new FriendsPage();
+        content.getChildren().addAll(page.notice, page.accountSection(), page.localCard());
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+        page.start();
+    }
+
+    /** What the launcher tells friends it is doing; sent as a heartbeat every 45 seconds while signed in. */
+    private volatile String presenceActivity = "In the launcher";
+    private volatile String presenceServer = "";
+    private java.util.concurrent.ScheduledExecutorService presenceScheduler;
+
+    private void startPresence() {
+        if (presenceScheduler != null) return;
+        presenceScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "vclient-presence");
+            thread.setDaemon(true);
+            return thread;
+        });
+        presenceScheduler.scheduleWithFixedDelay(this::sendPresenceNow, 3, 45, TimeUnit.SECONDS);
+    }
+
+    private void sendPresenceNow() {
+        String token = settings.backendToken();
+        BackendClient client = backend();
+        if (token.isBlank() || !client.configured() || settings.offlineMode()) return;
+        try {
+            client.sendPresence(token, presenceActivity, presenceServer);
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            // A missed heartbeat only means friends see you as offline for a moment; the next one retries.
+        }
+    }
+
+    private void setPresence(String activity, String server) {
+        presenceActivity = activity;
+        presenceServer = server;
+        executor.execute(this::sendPresenceNow);
+    }
+
+    /** The Friends page: V-Client account friends with presence, plus the old on-device list of names. */
+    private final class FriendsPage {
+        private final VBox notice = new VBox(10);
+        private final VBox requestsCard = ModsUi.glassCard(12, new Insets(20));
+        private final VBox friendsCard = ModsUi.glassCard(12, new Insets(20));
+        private final VBox requestsBody = new VBox(8);
+        private final VBox friendsBody = new VBox(8);
+        private final Label friendsCount = ModsUi.chip("", ModsUi.MUTED);
+        private final TextField username = new TextField();
+        private final Button add = new Button("ADD FRIEND");
+        private javafx.animation.Timeline refreshTimer;
+
+        FriendsPage() {
+            notice.setManaged(false);
+            notice.setVisible(false);
+            requestsCard.setManaged(false);
+            requestsCard.setVisible(false);
+        }
+
+        private boolean signedIn() {
+            return !settings.backendToken().isBlank() && backend().configured();
+        }
+
+        private void showNotice(javafx.scene.Node... nodes) {
+            notice.getChildren().setAll(nodes);
+            notice.setManaged(nodes.length > 0);
+            notice.setVisible(nodes.length > 0);
+        }
+
+        VBox accountSection() {
+            VBox section = new VBox(16);
+            if (!signedIn()) {
+                VBox card = ModsUi.glassCard(14, new Insets(22));
+                boolean noBackend = !backend().configured();
+                Label title = ModsUi.text(noBackend ? "Connect to the V-Client backend first" : "Sign in to add friends", 16, ModsUi.TEXT, true);
+                Label body = ModsUi.text(noBackend
+                        ? "Friends are stored on the V-Client backend. Set its address on the News page (Backend & updates), then create your account there."
+                        : "Create a free V-Client account or sign in on the News page. Then you can add friends by username, see who is online and what they are playing.",
+                        12, ModsUi.MUTED, false);
+                body.setWrapText(true);
+                Button open = new Button("OPEN THE NEWS PAGE");
+                open.setMinHeight(40);
+                open.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: #171326; -fx-font-size: 12px; -fx-font-weight: bold;"
+                        + " -fx-background-radius: 12; -fx-padding: 0 22 0 22; -fx-cursor: hand;");
+                open.setOnAction(event -> showNews());
+                card.getChildren().addAll(title, body, open);
+                section.getChildren().add(card);
+                return section;
+            }
+            VBox addCard = ModsUi.glassCard(12, new Insets(20));
+            username.setPromptText("Your friend's V-Client username");
+            username.setStyle("-fx-background-color: rgba(8, 9, 26, 0.85); -fx-text-fill: #f5f7fd; -fx-prompt-text-fill: #7f7fa6;"
+                    + " -fx-font-size: 13px; -fx-border-color: rgba(255,255,255,0.14); -fx-background-radius: 12;"
+                    + " -fx-border-radius: 12; -fx-padding: 0 14 0 14;");
+            username.setMinHeight(44);
+            username.setPrefHeight(44);
+            HBox.setHgrow(username, Priority.ALWAYS);
+            add.setMinHeight(44);
+            add.setMinWidth(Region.USE_PREF_SIZE);
+            add.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: #171326; -fx-font-size: 12px; -fx-font-weight: bold;"
+                    + " -fx-background-radius: 12; -fx-padding: 0 24 0 24; -fx-cursor: hand;");
+            add.setOnAction(event -> sendRequest());
+            username.setOnAction(event -> sendRequest());
+            HBox row = new HBox(12, username, add);
+            row.setAlignment(Pos.CENTER_LEFT);
+            addCard.getChildren().addAll(ModsUi.sectionTitle("Add a friend"), row);
+
+            requestsCard.getChildren().addAll(ModsUi.sectionTitle("Friend requests"), requestsBody);
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            HBox heading = new HBox(10, ModsUi.sectionTitle("Friends"), friendsCount);
+            heading.setAlignment(Pos.CENTER_LEFT);
+            friendsCard.getChildren().addAll(heading, friendsBody);
+            friendsBody.getChildren().add(ModsUi.busyLabel("Loading your friends…"));
+            section.getChildren().addAll(addCard, requestsCard, friendsCard);
+            return section;
+        }
+
+        void start() {
+            if (!signedIn()) return;
+            reload();
+            refreshTimer = new javafx.animation.Timeline(new javafx.animation.KeyFrame(javafx.util.Duration.seconds(20), event -> {
+                if (activePage != Page.FRIENDS) {
+                    refreshTimer.stop();
+                    return;
+                }
+                reload();
+            }));
+            refreshTimer.setCycleCount(javafx.animation.Animation.INDEFINITE);
+            refreshTimer.play();
+        }
+
+        private void reload() {
+            String token = settings.backendToken();
+            BackendClient client = backend();
+            executor.execute(() -> {
+                try {
+                    BackendClient.FriendsOverview overview = client.friends(token);
+                    Platform.runLater(() -> {
+                        if (activePage == Page.FRIENDS) render(overview);
+                    });
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    boolean expired = e instanceof BackendClient.BackendException && e.getMessage() != null
+                            && e.getMessage().toLowerCase(java.util.Locale.ROOT).contains("sign in");
+                    Platform.runLater(() -> {
+                        if (activePage != Page.FRIENDS) return;
+                        if (expired) {
+                            settings.setBackendToken("");
+                            saveSettings();
+                            showFriends();
+                            return;
+                        }
+                        String[] message = ModsUi.describeFailure("Loading your friends", e.getMessage());
+                        showNotice(ModsUi.warningBox(message[0], message[1], this::reload));
+                        friendsBody.getChildren().setAll(ModsUi.emptyCard("⚠", "Friends are unavailable right now",
+                                "Check the message above, then try again."));
+                    });
+                }
+            });
+        }
+
+        private void render(BackendClient.FriendsOverview overview) {
+            showNotice();
+            long online = overview.friends().stream().filter(BackendClient.Friend::online).count();
+            friendsCount.setText(overview.friends().size() + " friends  ·  " + online + " online");
+            if (overview.friends().isEmpty()) {
+                friendsBody.getChildren().setAll(ModsUi.emptyCard("♢", "No friends yet",
+                        "Type a friend's V-Client username above and send them a request."));
+            } else {
+                List<javafx.scene.Node> rows = new ArrayList<>();
+                for (BackendClient.Friend friend : overview.friends()) rows.add(friendRow(friend));
+                friendsBody.getChildren().setAll(rows);
+            }
+            boolean hasRequests = !overview.incoming().isEmpty() || !overview.outgoing().isEmpty();
+            requestsCard.setManaged(hasRequests);
+            requestsCard.setVisible(hasRequests);
+            List<javafx.scene.Node> requests = new ArrayList<>();
+            for (BackendClient.FriendRequest request : overview.incoming()) {
+                Button accept = smallButton("ACCEPT", ACCENT, "#171326");
+                accept.setOnAction(event -> respond(() -> backend().acceptFriend(settings.backendToken(), request.requestId())));
+                Button decline = smallButton("DECLINE", "rgba(255,255,255,0.08)", "#f5f7fd");
+                decline.setOnAction(event -> respond(() -> backend().dropFriendRequest(settings.backendToken(), request.requestId())));
+                requests.add(personRow(ModsUi.text(request.username(), 13, ModsUi.TEXT, true),
+                        ModsUi.text("wants to be your friend", 11, ModsUi.MUTED, false), accept, decline));
+            }
+            for (BackendClient.FriendRequest request : overview.outgoing()) {
+                Button cancel = smallButton("CANCEL", "rgba(255,255,255,0.08)", "#f5f7fd");
+                cancel.setOnAction(event -> respond(() -> backend().dropFriendRequest(settings.backendToken(), request.requestId())));
+                requests.add(personRow(ModsUi.text(request.username(), 13, ModsUi.TEXT, true),
+                        ModsUi.text("request sent, waiting for them", 11, ModsUi.MUTED, false), cancel));
+            }
+            requestsBody.getChildren().setAll(requests);
+        }
+
+        private Button smallButton(String label, String background, String textColor) {
+            Button button = new Button(label);
+            button.setMinHeight(32);
+            button.setMinWidth(Region.USE_PREF_SIZE);
+            button.setStyle("-fx-background-color: " + background + "; -fx-text-fill: " + textColor + "; -fx-font-size: 10px;"
+                    + " -fx-font-weight: bold; -fx-background-radius: 9; -fx-padding: 0 14 0 14; -fx-cursor: hand;");
+            return button;
+        }
+
+        private HBox personRow(javafx.scene.Node name, javafx.scene.Node detail, Button... actions) {
+            VBox text = new VBox(2, name, detail);
+            text.setMinWidth(0);
+            HBox.setHgrow(text, Priority.ALWAYS);
+            HBox row = new HBox(10, text);
+            row.getChildren().addAll(actions);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setPadding(new Insets(10, 14, 10, 14));
+            String base = "-fx-background-color: rgba(255,255,255,0.05); -fx-background-radius: 12;";
+            row.setStyle(base);
+            row.setOnMouseEntered(event -> row.setStyle(base + " -fx-background-color: rgba(255,255,255,0.09);"));
+            row.setOnMouseExited(event -> row.setStyle(base));
+            return row;
+        }
+
+        private HBox friendRow(BackendClient.Friend friend) {
+            Region dot = dot(friend.online() ? ModsUi.GOOD : "#5b5b78");
+            Label name = ModsUi.text(friend.username(), 14, ModsUi.TEXT, true);
+            String detail = friend.online()
+                    ? (friend.activity().isBlank() ? "Online" : friend.activity()) + (friend.server().isBlank() ? "" : "  ·  " + friend.server())
+                    : "Offline";
+            Label state = ModsUi.text(detail, 11, friend.online() ? "#8ff0b8" : "#7f7fa6", false);
+            HBox title = new HBox(8, dot, name);
+            if (!friend.minecraftName().isBlank()) title.getChildren().add(ModsUi.chip("MC: " + friend.minecraftName(), ModsUi.MUTED));
+            title.setAlignment(Pos.CENTER_LEFT);
+            Button remove = smallButton("REMOVE", "rgba(255,99,120,0.14)", "#ff9aa8");
+            remove.setOnAction(event -> {
+                Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Remove " + friend.username() + " from your friends?",
+                        ButtonType.OK, ButtonType.CANCEL);
+                confirm.initOwner(stage);
+                confirm.setTitle("V-Client");
+                confirm.setHeaderText("Remove friend");
+                if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+                    respond(() -> backend().removeFriend(settings.backendToken(), friend.userId()));
+                }
+            });
+            return personRow(title, state, remove);
+        }
+
+        @FunctionalInterface
+        private interface Call {
+            void run() throws IOException, InterruptedException;
+        }
+
+        private void respond(Call call) {
+            executor.execute(() -> {
+                try {
+                    call.run();
+                    Platform.runLater(this::reload);
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    Platform.runLater(() -> showNotice(ModsUi.warningBox("That didn't work", e.getMessage(), null)));
+                }
+            });
+        }
+
+        private void sendRequest() {
+            String name = username.getText() == null ? "" : username.getText().strip();
+            if (name.isEmpty()) return;
+            add.setDisable(true);
+            executor.execute(() -> {
+                try {
+                    String result = backend().requestFriend(settings.backendToken(), name);
+                    Platform.runLater(() -> {
+                        username.clear();
+                        showNotice(friendNotice("accepted".equals(result)
+                                ? "You and " + name + " are now friends."
+                                : "Friend request sent to " + name + "."));
+                        reload();
+                    });
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    Platform.runLater(() -> showNotice(ModsUi.warningBox("Couldn't add " + name, e.getMessage(), null)));
+                } finally {
+                    Platform.runLater(() -> add.setDisable(false));
+                }
+            });
+        }
+
+        private HBox friendNotice(String message) {
+            Label icon = ModsUi.text("✓", 16, "#08140e", true);
+            icon.setMinSize(30, 30);
+            icon.setAlignment(Pos.CENTER);
+            icon.setStyle(icon.getStyle() + " -fx-background-color: " + ModsUi.GOOD + "; -fx-background-radius: 15;");
+            HBox box = new HBox(12, icon, ModsUi.text(message, 13, "#bff5d6", true));
+            box.setAlignment(Pos.CENTER_LEFT);
+            box.setPadding(new Insets(12, 16, 12, 14));
+            box.setStyle("-fx-background-color: rgba(57,217,138,0.10); -fx-background-radius: 14;"
+                    + " -fx-border-color: rgba(57,217,138,0.40); -fx-border-radius: 14;");
+            return box;
+        }
+
+        /** The original list of Minecraft names saved only on this PC (no account needed). */
+        VBox localCard() {
+            VBox card = ModsUi.glassCard(12, new Insets(20));
+            TextField name = new TextField();
+            name.setPromptText("Minecraft username");
+            name.setStyle("-fx-background-color: rgba(8, 9, 26, 0.85); -fx-text-fill: #f5f7fd; -fx-prompt-text-fill: #7f7fa6;"
+                    + " -fx-font-size: 13px; -fx-border-color: rgba(255,255,255,0.14); -fx-background-radius: 12;"
+                    + " -fx-border-radius: 12; -fx-padding: 0 14 0 14;");
+            name.setMinHeight(40);
+            HBox.setHgrow(name, Priority.ALWAYS);
+            Button save = smallButton("SAVE NAME", "rgba(255,255,255,0.08)", "#f5f7fd");
+            save.setMinHeight(40);
+            VBox list = new VBox(6);
+            Runnable render = () -> {
+                List<javafx.scene.Node> rows = new ArrayList<>();
+                for (String saved : localFriends) {
+                    Button remove = smallButton("REMOVE", "rgba(255,99,120,0.14)", "#ff9aa8");
+                    remove.setOnAction(event -> {
+                        try {
+                            localFriends.clear();
+                            localFriends.addAll(friendsStore.remove(saved));
+                            showFriends();
+                        } catch (IOException e) {
+                            showNotice(ModsUi.warningBox("Couldn't remove the name", e.getMessage(), null));
+                        }
+                    });
+                    rows.add(personRow(ModsUi.text(saved, 13, ModsUi.TEXT, true), ModsUi.text("saved on this PC only", 11, ModsUi.MUTED, false), remove));
+                }
+                if (rows.isEmpty()) rows.add(ModsUi.text("No names saved yet.", 12, ModsUi.MUTED, false));
+                list.getChildren().setAll(rows);
+            };
+            save.setOnAction(event -> {
+                try {
+                    localFriends.clear();
+                    localFriends.addAll(friendsStore.add(name.getText()));
+                    name.clear();
+                    render.run();
+                } catch (IOException e) {
+                    showNotice(ModsUi.warningBox("Couldn't save the name", e.getMessage(), null));
+                }
+            });
+            render.run();
+            HBox row = new HBox(12, name, save);
+            row.setAlignment(Pos.CENTER_LEFT);
+            Label hint = ModsUi.text("Just a private notepad of Minecraft usernames on this device. No account and no server needed.", 11, ModsUi.MUTED, false);
+            hint.setWrapText(true);
+            card.getChildren().addAll(ModsUi.sectionTitle("Saved names (this PC only)"), row, list, hint);
+            return card;
+        }
     }
 
     private void showConsole() {
@@ -1459,7 +1761,7 @@ public final class LauncherApp extends Application {
         } else {
             box.getChildren().add(label("One account for Windows, Android and the website. Optional — you can play without it.", 11, MUTED));
             TextField login = new TextField();
-            login.setPromptText("Username or email");
+            login.setPromptText("Username or email  (for a new account: the username you want)");
             login.setStyle(fieldStyle());
             TextField email = new TextField();
             email.setPromptText("Email (only needed to create an account)");
@@ -1469,10 +1771,22 @@ public final class LauncherApp extends Application {
             password.setStyle(fieldStyle());
             Button signIn = button("SIGN IN", ACCENT, 10);
             Button create = button("CREATE ACCOUNT", "#292642", 10);
-            signIn.setDisable(!client.configured());
-            create.setDisable(!client.configured());
+            if (!client.configured()) {
+                box.getChildren().add(ModsUi.warningBox("The V-Client backend address is not set",
+                        "Accounts and friends live on the V-Client backend. Enter its address in the \"Backend & updates\" box below and press SAVE ADDRESS, then come back here.",
+                        null));
+            }
             box.getChildren().addAll(login, email, password, new HBox(10, signIn, create), result);
             java.util.function.Consumer<Boolean> submit = register -> {
+                if (!backend().configured()) {
+                    result.setText("Set the backend address in the box below first.");
+                    return;
+                }
+                if (login.getText().isBlank() || password.getText().isEmpty() || (register && email.getText().isBlank())) {
+                    result.setText(register ? "Enter a username, an email and a password (8+ characters)."
+                            : "Enter your username (or email) and your password.");
+                    return;
+                }
                 signIn.setDisable(true);
                 create.setDisable(true);
                 String loginText = login.getText().strip();
@@ -1713,6 +2027,7 @@ public final class LauncherApp extends Application {
 
     private void startBackendTasks() {
         reportEventAsync("launch");
+        startPresence();
         if (settings.autoUpdate()) checkForUpdates(false);
     }
 
@@ -2749,6 +3064,7 @@ public final class LauncherApp extends Application {
                 : "Starting Minecraft from V-Client's private folder ")
                 + selected.displayName()
                 + " for " + selectedAccount.name() + " (" + selectedAccount.type().label() + ")...");
+        setPresence("Playing Minecraft", joinSmp ? "VSMP" : "");
         executor.execute(() -> {
             try {
                 Consumer<String> output = line -> Platform.runLater(() -> appendLog(line));
@@ -2774,6 +3090,7 @@ public final class LauncherApp extends Application {
                     showLaunchFailure(e, settings.minecraftDirectory());
                 });
             } finally {
+                setPresence("In the launcher", "");
                 Platform.runLater(() -> {
                     if (playButton != null) {
                         playButton.setDisable(false);

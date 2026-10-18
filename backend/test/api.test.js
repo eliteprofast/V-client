@@ -223,3 +223,59 @@ test('cosmetics: admin publishes an item with an asset, players download it, pre
   assert.equal(hidden.items.length, 0);
   assert.deepEqual(hidden.removed, ['royal_cape']);
 });
+
+test('friends: request, accept, presence, decline and remove', async (t) => {
+  const { call } = await start(t);
+  const signUp = async (name) => (await call('POST', '/api/auth/register', { body: { username: name, email: `${name}@example.com`, password: 'password123' } })).json.token;
+  const alice = await signUp('Alice_1');
+  const bob = await signUp('Bob_22');
+  const carol = await signUp('Carol_3');
+
+  assert.equal((await call('GET', '/api/friends')).status, 401);
+  assert.equal((await call('POST', '/api/friends/request', { token: alice, body: { username: 'Alice_1' } })).status, 400);
+  assert.equal((await call('POST', '/api/friends/request', { token: alice, body: { username: 'Nobody_9' } })).status, 404);
+  assert.equal((await call('POST', '/api/friends/request', { token: alice, body: { username: '!!' } })).status, 400);
+
+  const sent = await call('POST', '/api/friends/request', { token: alice, body: { username: 'bob_22' } });
+  assert.equal(sent.status, 201);
+  assert.equal(sent.json.status, 'pending');
+  assert.equal((await call('POST', '/api/friends/request', { token: alice, body: { username: 'Bob_22' } })).status, 409);
+
+  const bobsView = (await call('GET', '/api/friends', { token: bob })).json;
+  assert.equal(bobsView.incoming.length, 1);
+  assert.equal(bobsView.incoming[0].username, 'Alice_1');
+  assert.equal((await call('GET', '/api/friends', { token: alice })).json.outgoing[0].username, 'Bob_22');
+
+  // Only the addressee can accept.
+  const requestId = bobsView.incoming[0].requestId;
+  assert.equal((await call('POST', `/api/friends/requests/${requestId}/accept`, { token: alice })).status, 404);
+  assert.equal((await call('POST', `/api/friends/requests/${requestId}/accept`, { token: carol })).status, 404);
+  assert.equal((await call('POST', `/api/friends/requests/${requestId}/accept`, { token: bob })).status, 200);
+
+  // Presence: friends see activity, strangers see nothing, and nobody is online before a heartbeat.
+  assert.equal((await call('GET', '/api/friends', { token: alice })).json.friends[0].online, false);
+  assert.equal((await call('PUT', '/api/presence', { token: bob, body: { activity: 'Playing Minecraft', server: 'VSMP', platform: 'windows' } })).status, 200);
+  const alicesView = (await call('GET', '/api/friends', { token: alice })).json;
+  assert.equal(alicesView.friends[0].username, 'Bob_22');
+  assert.equal(alicesView.friends[0].online, true);
+  assert.equal(alicesView.friends[0].activity, 'Playing Minecraft');
+  assert.equal(alicesView.friends[0].server, 'VSMP');
+  assert.ok(!('email' in alicesView.friends[0]));
+  assert.equal((await call('GET', '/api/friends', { token: carol })).json.friends.length, 0);
+
+  // Adding someone who already asked you accepts their request; declining removes it.
+  await call('POST', '/api/friends/request', { token: carol, body: { username: 'Alice_1' } });
+  const back = await call('POST', '/api/friends/request', { token: alice, body: { username: 'Carol_3' } });
+  assert.equal(back.json.status, 'accepted');
+  const dave = await signUp('Dave_44');
+  await call('POST', '/api/friends/request', { token: dave, body: { username: 'Bob_22' } });
+  const pending = (await call('GET', '/api/friends', { token: bob })).json.incoming[0];
+  assert.equal((await call('DELETE', `/api/friends/requests/${pending.requestId}`, { token: bob })).status, 200);
+  assert.equal((await call('GET', '/api/friends', { token: bob })).json.incoming.length, 0);
+
+  // Removing a friend works for either side.
+  const bobId = alicesView.friends[0].userId;
+  assert.equal((await call('DELETE', `/api/friends/${bobId}`, { token: alice })).status, 200);
+  assert.equal((await call('GET', '/api/friends', { token: bob })).json.friends.length, 0);
+  assert.equal((await call('DELETE', `/api/friends/${bobId}`, { token: alice })).status, 404);
+});

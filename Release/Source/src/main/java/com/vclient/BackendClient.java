@@ -34,6 +34,14 @@ final class BackendClient {
     record UpdateInfo(boolean updateAvailable, boolean mandatory, Release latest) {
     }
 
+    /** A friend with presence: {@code online} is true while their launcher is sending heartbeats. */
+    record Friend(int userId, String username, String minecraftName, boolean online, String activity, String server) {}
+
+    /** A pending friend request; {@code userId} / {@code username} are the other person. */
+    record FriendRequest(int requestId, int userId, String username) {}
+
+    record FriendsOverview(List<Friend> friends, List<FriendRequest> incoming, List<FriendRequest> outgoing) {}
+
     record Session(String token, String username, String minecraftName, String elybyName) {
     }
 
@@ -169,6 +177,50 @@ final class BackendClient {
             owned.add(id.asText());
         }
         return owned;
+    }
+
+    FriendsOverview friends(String token) throws IOException, InterruptedException {
+        JsonNode root = send("GET", "/api/friends", null, token);
+        List<Friend> friends = new ArrayList<>();
+        for (JsonNode node : root.path("friends")) {
+            friends.add(new Friend(node.path("userId").asInt(), node.path("username").asText(),
+                    node.path("minecraftName").asText(""), node.path("online").asBoolean(),
+                    node.path("activity").asText(""), node.path("server").asText("")));
+        }
+        return new FriendsOverview(List.copyOf(friends), requests(root.path("incoming")), requests(root.path("outgoing")));
+    }
+
+    private static List<FriendRequest> requests(JsonNode nodes) {
+        List<FriendRequest> result = new ArrayList<>();
+        for (JsonNode node : nodes) {
+            result.add(new FriendRequest(node.path("requestId").asInt(), node.path("userId").asInt(), node.path("username").asText()));
+        }
+        return List.copyOf(result);
+    }
+
+    /** Sends a friend request; returns "pending", or "accepted" when they had already asked you. */
+    String requestFriend(String token, String username) throws IOException, InterruptedException {
+        return send("POST", "/api/friends/request", JSON.createObjectNode().put("username", username), token)
+                .path("status").asText("pending");
+    }
+
+    void acceptFriend(String token, int requestId) throws IOException, InterruptedException {
+        send("POST", "/api/friends/requests/" + requestId + "/accept", JSON.createObjectNode(), token);
+    }
+
+    /** Declines an incoming request or cancels an outgoing one. */
+    void dropFriendRequest(String token, int requestId) throws IOException, InterruptedException {
+        send("DELETE", "/api/friends/requests/" + requestId, null, token);
+    }
+
+    void removeFriend(String token, int userId) throws IOException, InterruptedException {
+        send("DELETE", "/api/friends/" + userId, null, token);
+    }
+
+    /** The launcher's heartbeat: tells friends you are online and what you are doing. */
+    void sendPresence(String token, String activity, String server) throws IOException, InterruptedException {
+        ObjectNode body = JSON.createObjectNode().put("activity", activity).put("server", server).put("platform", AppInfo.PLATFORM);
+        send("PUT", "/api/presence", body, token);
     }
 
     private Session session(JsonNode root) {

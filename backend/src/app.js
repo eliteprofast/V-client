@@ -8,6 +8,7 @@ const publicRoutes = require('./routes/public');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const cosmeticsRoutes = require('./routes/cosmetics');
+const friendsRoutes = require('./routes/friends');
 
 /** Builds the Express app. Everything stateful (db, config) is injected so tests can run in memory. */
 function createApp(config, options = {}) {
@@ -41,6 +42,8 @@ function createApp(config, options = {}) {
 
   app.use('/api', rateLimit({ windowMs: 60_000, max: 240, bucket: 'api' }), publicRoutes(ctx));
   app.use('/api/cosmetics', cosmeticsRoutes(ctx));
+  app.use('/api/friends', friendsRoutes(ctx));
+  app.use('/api/presence', friendsRoutes.presence(ctx));
   app.use('/api/auth', authRoutes(ctx));
   app.use('/api/admin/cosmetics', cosmeticsRoutes.admin(ctx));
   app.use('/api/admin', adminRoutes(ctx));

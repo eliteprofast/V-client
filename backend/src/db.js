@@ -65,6 +65,23 @@ function openDatabase(dataDir) {
     );
     CREATE INDEX IF NOT EXISTS events_time ON events (created_at);
     CREATE INDEX IF NOT EXISTS events_install ON events (install_id);
+    CREATE TABLE IF NOT EXISTS friendships (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      addressee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL CHECK (status IN ('pending','accepted')),
+      created_at INTEGER NOT NULL,
+      responded_at INTEGER,
+      UNIQUE (requester_id, addressee_id)
+    );
+    CREATE INDEX IF NOT EXISTS friendships_addressee ON friendships (addressee_id);
+    CREATE TABLE IF NOT EXISTS presence (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      last_seen INTEGER NOT NULL,
+      activity TEXT NOT NULL DEFAULT '',
+      server TEXT NOT NULL DEFAULT '',
+      platform TEXT NOT NULL DEFAULT ''
+    );
     CREATE TABLE IF NOT EXISTS cosmetics (
       id TEXT PRIMARY KEY,
       version INTEGER NOT NULL DEFAULT 1,

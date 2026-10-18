@@ -57,6 +57,8 @@ Public (no sign-in):
 | `GET /api/cosmetics/catalog` | In-game cosmetics (capes, wings, hats, emotes, trails) with `ETag`; assets at `/api/cosmetics/assets/:file` |
 | `GET /api/cosmetics/owned/:uuid` | Premium/event cosmetics a player has been granted |
 
+Friends and presence (V-Client accounts, `Authorization: Bearer <token>`): `GET /api/friends` (friends with online status and activity, incoming and outgoing requests), `POST /api/friends/request` `{ username }`, `POST /api/friends/requests/:id/accept`, `DELETE /api/friends/requests/:id` (decline or cancel), `DELETE /api/friends/:userId`, and `PUT /api/presence` `{ activity, server, platform }` (the launcher sends this every ~45 seconds; a player counts as online for 2 minutes after the last one). Friends see only username, linked Minecraft name, activity and server, never an email.
+
 Accounts (`Authorization: Bearer <token>`): `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `PUT /api/auth/profile`, `PUT /api/auth/password`. Passwords are hashed with scrypt; auth endpoints are rate limited.
 
 Management API (admin role only; there is no web panel, use curl or any HTTP client): `GET/POST/PUT/DELETE /api/admin/news`, `/api/admin/announcements`, `/api/admin/releases` (+ `PUT /api/admin/releases/:id/file?ext=.apk` with the raw installer as the body), `GET /api/admin/users`, `GET /api/admin/stats`, and `/api/admin/cosmetics` (items, PNG assets, per-player grants; see [docs/COSMETICS_API.md](../docs/COSMETICS_API.md)).
