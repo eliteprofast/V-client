@@ -10,7 +10,10 @@ final class AppInfo {
      * Players can override it in the News page; the {@code VCLIENT_BACKEND_URL} environment variable also wins over this value.
      * Leave empty to ship a build that does not contact any backend until one is configured.
      */
-    static final String DEFAULT_BACKEND_URL = "";
+    static final String DEFAULT_BACKEND_URL = "https://vsmp-client-backend.onrender.com";
+
+    /** The old static-website service. It has no API, so a saved copy of this address is replaced by the default. */
+    static final String RETIRED_BACKEND_URL = "https://vsmp-client.onrender.com";
 
     static final String PLATFORM = "windows";
 

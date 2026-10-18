@@ -66,6 +66,9 @@ final class LauncherSettings {
                 saved.path("discordInvite").asText(""),
                 saved.path("offlineMode").asBoolean(true));
         settings.backendUrl = saved.path("backendUrl").asText("");
+        if (BackendClient.normalize(settings.backendUrl).equalsIgnoreCase(AppInfo.RETIRED_BACKEND_URL)) {
+            settings.backendUrl = "";
+        }
         settings.backendToken = saved.path("backendToken").asText("");
         settings.autoUpdate = saved.path("autoUpdate").asBoolean(true);
         settings.debugMode = saved.path("debugMode").asBoolean(false);
