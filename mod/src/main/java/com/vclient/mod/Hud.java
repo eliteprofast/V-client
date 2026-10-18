@@ -32,7 +32,8 @@ public final class Hud {
     private static final EquipmentSlot[] ARMOR_SLOTS = {EquipmentSlot.byName("head"),
             EquipmentSlot.byName("chest"), EquipmentSlot.byName("legs"), EquipmentSlot.byName("feet")};
     private static final Module[] LEFT_COLUMN = {Module.FPS, Module.CPS, Module.PING, Module.SPEED, Module.CLOCK,
-            Module.MEMORY, Module.DAY_COUNTER, Module.SERVER_ADDRESS, Module.COORDINATES, Module.KEYSTROKES};
+            Module.MEMORY, Module.DAY_COUNTER, Module.SERVER_ADDRESS, Module.ITEM_COUNT, Module.LAST_DEATH,
+            Module.DURABILITY, Module.LIGHT_LEVEL, Module.BIOME, Module.COORDINATES, Module.KEYSTROKES};
     private static final String[] ROMAN = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
 
     private static final ArrayDeque<Long> LEFT_CLICKS = new ArrayDeque<>();
@@ -213,9 +214,43 @@ public final class Hud {
             case DAY_COUNTER -> new String[]{"Day: ", client.world == null ? "0"
                     : Long.toString(client.world.getTimeOfDay() / 24000L)};
             case SERVER_ADDRESS -> new String[]{"Server: ", server(client)};
+            case ITEM_COUNT -> {
+                String[] item = ITEM_CHOICES[Math.clamp(VConfig.integer(module, "item"), 0, ITEM_CHOICES.length - 1)];
+                yield new String[]{item[0] + ": ", Integer.toString(VClientMod.countItem(client, item[1]))};
+            }
+            case LAST_DEATH -> new String[]{"Died: ", VClientMod.lastDeath()};
+            case DURABILITY -> new String[]{"Durability: ", durability(client)};
+            case LIGHT_LEVEL -> new String[]{"Light: ", client.world == null || client.player == null ? "-"
+                    : Integer.toString(client.world.getLightLevel(client.player.getBlockPos()))};
+            case BIOME -> new String[]{"Biome: ", biome(client)};
             case TOGGLE_SPRINT -> new String[]{"[Sprinting (Toggled)]", ""};
             default -> new String[]{"", ""};
         };
+    }
+
+    /** Item Counter choices: label and registry path. */
+    private static final String[][] ITEM_CHOICES = {{"Totems", "totem_of_undying"}, {"Arrows", "arrow"},
+            {"Ender Pearls", "ender_pearl"}, {"Golden Apples", "golden_apple"}, {"XP Bottles", "experience_bottle"},
+            {"Fireworks", "firework_rocket"}};
+
+    private static String durability(MinecraftClient client) {
+        if (client.player == null) return "-";
+        var stack = client.player.getMainHandStack();
+        if (stack.isEmpty() || !stack.isDamageable()) return "-";
+        int left = stack.getMaxDamage() - stack.getDamage();
+        return left + "/" + stack.getMaxDamage() + " (" + Math.round(left * 100f / stack.getMaxDamage()) + "%)";
+    }
+
+    private static String biome(MinecraftClient client) {
+        if (client.world == null || client.player == null) return "-";
+        String name = client.world.getBiome(client.player.getBlockPos()).getKey()
+                .map(key -> key.getValue().getPath()).orElse("unknown");
+        StringBuilder pretty = new StringBuilder();
+        for (String word : name.split("_")) {
+            if (pretty.length() > 0) pretty.append(' ');
+            pretty.append(word.isEmpty() ? word : Character.toUpperCase(word.charAt(0)) + word.substring(1));
+        }
+        return pretty.toString();
     }
 
     private static String clock(Module module) {

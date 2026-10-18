@@ -101,6 +101,7 @@ public final class VClientMod implements ClientModInitializer {
         }
 
         com.vclient.mod.cosmetics.Cosmetics.tick(client);
+        trackDeath(client);
 
         if (cheatsAllowed()) tickCheats(client);
 
@@ -191,6 +192,129 @@ public final class VClientMod implements ClientModInitializer {
             client.options.forwardKey.setPressed(true);
         }
         tickMoreCheats(client);
+        tickUtilities(client);
+    }
+
+    private static int utilityCooldown;
+    private static boolean eating;
+    private static int eatTicks;
+    private static int eatReturnSlot = -1;
+    private static final java.util.Set<String> NOT_FOR_EATING = java.util.Set.of("golden_apple", "enchanted_golden_apple",
+            "rotten_flesh", "spider_eye", "poisonous_potato", "pufferfish", "chorus_fruit", "suspicious_stew");
+
+    /** UseAction is NONE, EAT, DRINK, ...: its constants have no readable names at runtime, so EAT is its position. */
+    private static final int EAT_ORDINAL = 1;
+
+    static String itemId(net.minecraft.item.ItemStack stack) {
+        return net.minecraft.registry.Registries.ITEM.getId(stack.getItem()).getPath();
+    }
+
+    /** Auto Totem, Auto Tool and Auto Eat. */
+    private static void tickUtilities(MinecraftClient client) {
+        var player = client.player;
+        var inventory = player.getInventory();
+        boolean free = client.currentScreen == null;
+        if (utilityCooldown > 0) utilityCooldown--;
+
+        if (VConfig.enabled(Module.AUTO_TOTEM) && utilityCooldown == 0 && client.interactionManager != null
+                && !"totem_of_undying".equals(itemId(player.getOffHandStack()))) {
+            for (int i = 0; i < 36; i++) {
+                if (!"totem_of_undying".equals(itemId(inventory.getStack(i)))) continue;
+                // Player screen handler slots: 9-35 main inventory, 36-44 hotbar; button 40 swaps with the off hand.
+                int slot = i < 9 ? 36 + i : i;
+                client.interactionManager.clickSlot(player.playerScreenHandler.syncId, slot, 40,
+                        net.minecraft.screen.slot.SlotActionType.SWAP, player);
+                utilityCooldown = 6;
+                break;
+            }
+        }
+
+        if (VConfig.enabled(Module.AUTO_TOOL) && free && client.options.attackKey.isPressed() && client.world != null
+                && client.crosshairTarget instanceof net.minecraft.util.hit.BlockHitResult hit) {
+            var state = client.world.getBlockState(hit.getBlockPos());
+            int best = inventory.getSelectedSlot();
+            float bestSpeed = inventory.getStack(best).getMiningSpeedMultiplier(state);
+            for (int i = 0; i < 9; i++) {
+                float speed = inventory.getStack(i).getMiningSpeedMultiplier(state);
+                if (speed > bestSpeed + 0.01f) {
+                    best = i;
+                    bestSpeed = speed;
+                }
+            }
+            if (best != inventory.getSelectedSlot()) inventory.setSelectedSlot(best);
+        }
+
+        if (VConfig.enabled(Module.AUTO_EAT) && free) {
+            boolean hungry = player.getHungerManager().getFoodLevel() <= VConfig.integer(Module.AUTO_EAT, "hunger")
+                    && !player.isCreative() && !player.isSpectator();
+            if (eating) {
+                eatTicks++;
+                if (eatTicks > 3 && (!player.isUsingItem() || !hungry)) {
+                    client.options.useKey.setPressed(false);
+                    eating = false;
+                    if (eatReturnSlot >= 0) inventory.setSelectedSlot(eatReturnSlot);
+                    eatReturnSlot = -1;
+                    utilityCooldown = 10;
+                }
+            } else if (hungry && !player.isUsingItem() && utilityCooldown == 0) {
+                for (int i = 0; i < 9; i++) {
+                    var stack = inventory.getStack(i);
+                    if (stack.isEmpty() || stack.getUseAction().ordinal() != EAT_ORDINAL
+                            || NOT_FOR_EATING.contains(itemId(stack))) continue;
+                    eatReturnSlot = inventory.getSelectedSlot();
+                    inventory.setSelectedSlot(i);
+                    client.options.useKey.setPressed(true);
+                    eating = true;
+                    eatTicks = 0;
+                    break;
+                }
+            }
+        } else if (eating) {
+            client.options.useKey.setPressed(false);
+            eating = false;
+        }
+    }
+
+    // ---- HUD data for the Item Counter and Last Death
+
+    private static String lastDeath = "no deaths yet";
+    private static boolean deathRecorded;
+
+    public static String lastDeath() {
+        return lastDeath;
+    }
+
+    /** How many of an item (by registry path, e.g. "arrow") the player carries, off hand included. */
+    public static int countItem(MinecraftClient client, String path) {
+        if (client.player == null) return 0;
+        int total = 0;
+        var inventory = client.player.getInventory();
+        for (int i = 0; i < inventory.size(); i++) {
+            var stack = inventory.getStack(i);
+            if (path.equals(itemId(stack))) total += stack.getCount();
+        }
+        var offhand = client.player.getOffHandStack();
+        if (path.equals(itemId(offhand)) && !contains(inventory, offhand)) total += offhand.getCount();
+        return total;
+    }
+
+    private static boolean contains(net.minecraft.entity.player.PlayerInventory inventory, net.minecraft.item.ItemStack stack) {
+        for (int i = 0; i < inventory.size(); i++) if (inventory.getStack(i) == stack) return true;
+        return false;
+    }
+
+    private static void trackDeath(MinecraftClient client) {
+        if (client.player == null || client.world == null) return;
+        if (client.player.isDead()) {
+            if (!deathRecorded) {
+                deathRecorded = true;
+                lastDeath = String.format(java.util.Locale.ROOT, "%d %d %d (%s)", (int) client.player.getX(),
+                        (int) client.player.getY(), (int) client.player.getZ(),
+                        client.world.getRegistryKey().getValue().getPath());
+            }
+        } else {
+            deathRecorded = false;
+        }
     }
 
     private static int afkTicks;
