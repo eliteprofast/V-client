@@ -4,6 +4,7 @@
 const $ = (id) => document.getElementById(id);
 let token = "";
 let names = {};
+const ADMIN_UUID = "1331c81d33844eb6baf6a511c8298af3";
 
 function say(text, ok) {
   const box = $("message");
@@ -73,7 +74,8 @@ async function showOwned() {
     // Granting nothing resolves the name; use the grants list for the UUID once we have it.
     const uuid = await resolve(player);
     const data = await call("GET", `/admin/cosmetics/grants?uuid=${uuid}`);
-    $("owned").textContent = data.items.length ? data.items.map((item) => label(item.cosmeticId)).join(", ") : "Nothing unlocked yet.";
+    const owned = data.items.length ? data.items.map((item) => label(item.cosmeticId)).join(", ") : "Nothing granted yet.";
+    $("owned").textContent = uuid === ADMIN_UUID ? "Admin account: every cosmetic is unlocked automatically. " + owned : owned;
     say(`Player ${uuid}`, true);
   } catch (error) {
     say(error.message, false);
