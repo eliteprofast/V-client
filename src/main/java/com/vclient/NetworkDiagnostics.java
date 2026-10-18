@@ -22,7 +22,8 @@ final class NetworkDiagnostics {
             "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
     private static final URI INTERNET_PROBE = URI.create("https://www.msftconnecttest.com/connecttest.txt");
     private static final List<String> DNS_HOSTS = List.of(
-            "piston-meta.mojang.com", "www.msftconnecttest.com");
+            "piston-meta.mojang.com", "www.msftconnecttest.com", "api.modrinth.com", "textures.minecraft.net",
+            "authserver.ely.by");
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final HttpClient HTTP = PlatformTls.httpClientBuilder(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NORMAL).build();
@@ -189,6 +190,12 @@ final class NetworkDiagnostics {
         });
         try {
             String detail = resolution.get(8, TimeUnit.SECONDS);
+            List<String> blocked = new ArrayList<>();
+            for (String host : DNS_HOSTS) {
+                DnsBlock.Finding finding = DnsBlock.inspect(host);
+                if (finding != null) blocked.add(DnsBlock.explain(finding));
+            }
+            if (!blocked.isEmpty()) return new Check("DNS resolution", false, String.join(" ", blocked) + " [" + detail + "]");
             return new Check("DNS resolution", true, detail);
         } catch (java.util.concurrent.TimeoutException e) {
             resolution.cancel(true);

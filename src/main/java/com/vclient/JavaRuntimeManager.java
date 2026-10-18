@@ -348,6 +348,19 @@ final class JavaRuntimeManager {
     }
 
     static IOException explainTlsFailure(String address, IOException error) {
+        String host = null;
+        try {
+            host = URI.create(address).getHost();
+        } catch (IllegalArgumentException ignored) {
+            // Not a URL; fall through to the generic messages.
+        }
+        if (host != null) {
+            DnsBlock.Finding blocked = DnsBlock.inspect(host);
+            if (blocked != null) {
+                return new IOException(DnsBlock.explain(blocked) + " (Technical detail: "
+                        + PlatformTls.describeFailure(error) + ")", error);
+            }
+        }
         Throwable cause = error;
         while (cause != null) {
             if (cause instanceof javax.net.ssl.SSLException) {

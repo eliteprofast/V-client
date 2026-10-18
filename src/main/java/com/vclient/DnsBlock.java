@@ -1,0 +1,82 @@
+package com.vclient;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Detects the case where a network's DNS filter answers for a real website with the address of its own block
+ * page. The connection then reaches the filter instead of the site, which refuses the TLS handshake
+ * ("handshake_failure"), so every HTTPS request to that host fails even though Java, the certificates and the
+ * launcher are fine. This is how api.modrinth.com and Mojang's skin host fail on networks that use
+ * OpenDNS / Cisco Umbrella style filtering.
+ */
+final class DnsBlock {
+    /** A host whose DNS answer looks like a filter's block page. */
+    record Finding(String host, List<String> addresses, String realAddresses) {}
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    private DnsBlock() {}
+
+    /** True for the addresses block pages and "null routes" use. Private LAN addresses are not flagged. */
+    static boolean isSinkhole(InetAddress address) {
+        byte[] bytes = address.getAddress();
+        boolean ciscoUmbrella = bytes.length == 4 && (bytes[0] & 0xFF) == 146 && (bytes[1] & 0xFF) == 112;
+        return ciscoUmbrella || address.isLoopbackAddress() || address.isAnyLocalAddress()
+                || address.isLinkLocalAddress();
+    }
+
+    /** Resolves {@code host} the way Java does and returns a finding when the answer is a block page; else null. */
+    static Finding inspect(String host) {
+        try {
+            InetAddress[] resolved = InetAddress.getAllByName(host);
+            List<String> addresses = new ArrayList<>();
+            boolean blocked = false;
+            for (InetAddress address : resolved) {
+                addresses.add(address.getHostAddress());
+                if (isSinkhole(address)) blocked = true;
+            }
+            return blocked ? new Finding(host, List.copyOf(addresses), realAddresses(host)) : null;
+        } catch (java.io.IOException e) {
+            return null;
+        }
+    }
+
+    /** What an independent resolver (Cloudflare over HTTPS) says, as proof the name is not really there. */
+    private static String realAddresses(String host) {
+        try {
+            HttpClient client = PlatformTls.httpClientBuilder(Duration.ofSeconds(4)).build();
+            HttpRequest request = HttpRequest.newBuilder(URI.create("https://1.1.1.1/dns-query?name=" + host + "&type=A"))
+                    .timeout(Duration.ofSeconds(5)).header("Accept", "application/dns-json").GET().build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            List<String> real = new ArrayList<>();
+            for (JsonNode answer : JSON.readTree(response.body()).path("Answer")) {
+                if (answer.path("type").asInt() == 1) real.add(answer.path("data").asText());
+            }
+            return String.join(", ", real);
+        } catch (java.io.IOException | RuntimeException e) {
+            return "";
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "";
+        }
+    }
+
+    static String explain(Finding finding) {
+        return finding.host() + " resolves to " + String.join(", ", finding.addresses())
+                + ", which is a DNS filter's block page (OpenDNS / Cisco Umbrella style), not the real server"
+                + (finding.realAddresses().isEmpty() ? "" : " (its real address is " + finding.realAddresses() + ")")
+                + ". The connection reaches the filter, which refuses the TLS handshake - this is a network setting, "
+                + "not a certificate or Java problem. Fix: set this PC's DNS (or your router's) to 1.1.1.1 and 8.8.8.8, "
+                + "or ask whoever manages the network to allow " + finding.host() + ".";
+    }
+}
