@@ -40,9 +40,23 @@ public final class CosmeticTextures {
     public static Identifier current(Cosmetic cosmetic) {
         Entry entry = entry(cosmetic);
         if (entry == null) return null;
-        if (entry.frames.length == 1) return entry.frames[0];
+        return entry.frames[frameOf(entry)];
+    }
+
+    /**
+     * Which animation frame is showing right now: -1 while the texture is not ready, 0 for a still texture.
+     * Callers that cache anything built from {@link #current} must include this number in the cache key,
+     * otherwise an animated texture freezes on the frame that was current when the cache was filled.
+     */
+    public static int frameIndex(Cosmetic cosmetic) {
+        Entry entry = entry(cosmetic);
+        return entry == null ? -1 : frameOf(entry);
+    }
+
+    private static int frameOf(Entry entry) {
+        if (entry.frames.length == 1) return 0;
         long tick = System.nanoTime() / 50_000_000L;
-        return entry.frames[(int) ((tick / Math.max(1, entry.frameTicks)) % entry.frames.length)];
+        return (int) ((tick / Math.max(1, entry.frameTicks)) % entry.frames.length);
     }
 
     /** Pixel size of the texture sheet (used to size model UVs), or null when not loaded. */
@@ -188,6 +202,7 @@ public final class CosmeticTextures {
 
     private static NativeImage paint(JsonObject generator, String seed, int width, int height, int frame, int frames) {
         String type = Cosmetic.string(generator, "type", "solid");
+        if (CapeArt.handles(type)) return CapeArt.paint(type, seed, width, height, frame, frames);
         int[] colors = colors(generator);
         boolean horizontal = "horizontal".equals(Cosmetic.string(generator, "direction", "vertical"));
         int size = Math.max(1, intValue(generator, "size", 2));

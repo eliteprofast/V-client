@@ -39,6 +39,7 @@ public final class SkinFix {
     private static SkinTextures lastInput;
     private static SkinTextures lastOutput;
     private static int lastStateVersion = -1;
+    private static int lastFrame = -3;
     private static int lastSkinVersion = -1;
     private static int lastCatalogRevision = -1;
 
@@ -137,13 +138,18 @@ public final class SkinFix {
         MinecraftClient client = MinecraftClient.getInstance();
         if (!isLocalPlayer(client, id)) return original;
         int state = CosmeticState.version();
+        // The cape frame is part of the cache key: an animated cape needs a new SkinTextures each time its frame
+        // changes (a few times a second), and a cape whose texture finished loading must replace the cached one.
+        Cosmetic cape = CosmeticState.effective(CosmeticSlot.CAPE);
+        int frame = cape == null ? -2 : CosmeticTextures.frameIndex(cape);
         if (original == lastInput && state == lastStateVersion && loadedVersion == lastSkinVersion
-                && CosmeticCatalog.revision() == lastCatalogRevision) {
+                && CosmeticCatalog.revision() == lastCatalogRevision && frame == lastFrame) {
             return lastOutput;
         }
         SkinTextures result = compute(original);
         lastInput = original;
         lastOutput = result;
+        lastFrame = frame;
         lastStateVersion = state;
         lastSkinVersion = loadedVersion;
         lastCatalogRevision = CosmeticCatalog.revision();
