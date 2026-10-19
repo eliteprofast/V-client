@@ -100,3 +100,16 @@ The API is `POST /api/admin/cosmetics/grants` with `{ "player": "<name or uuid>"
 `{ "player": "<name or uuid>", "invites": 10 }`; `GET /api/admin/cosmetics/rewards` lists the ladder.
 Tiers (5, 8, 10, 12, 15, 17, 20 invites) live in `src/rewards.js`. On the free Render plan grants are lost on every
 restart, so use a persistent disk or database before relying on them.
+
+## Keeping data on Render's free plan (GitHub backup)
+
+The free plan wipes the disk whenever the service sleeps or restarts, which would delete accounts, friends and
+grants. Set two environment variables and the backend saves them to a private GitHub repository and restores them
+at start-up (and saves again on shutdown):
+
+- `BACKUP_GITHUB_REPO` - `owner/name` of a **private** repository (create an empty one, e.g. `vclient-data`).
+- `BACKUP_GITHUB_TOKEN` - a fine-grained personal access token limited to that repository with
+  "Contents: Read and write".
+
+Checks the logs for `GitHub backup: on` and `Backup restored from GitHub`. If a restore fails, saving is switched
+off so the stored backup is never overwritten with an empty database.

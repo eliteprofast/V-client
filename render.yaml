@@ -19,6 +19,10 @@ services:
         value: "1"
       - key: ADMIN_PASSWORD
         sync: false   # you are asked for this in the dashboard
+      - key: BACKUP_GITHUB_TOKEN
+        sync: false   # fine-grained token, Contents read/write on the private backup repo
+      - key: BACKUP_GITHUB_REPO
+        sync: false   # owner/name of the private backup repo
       - key: JAVA_HOST
         value: neuron.zeroxhost.space
       - key: JAVA_PORT
