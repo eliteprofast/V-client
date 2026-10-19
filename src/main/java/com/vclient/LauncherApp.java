@@ -1628,7 +1628,8 @@ public final class LauncherApp extends Application {
         box.setVisible(false);
         BackendClient client = backend();
         String token = settings.backendToken();
-        if (token.isBlank() || !client.configured()) return box;
+        // Only the admin game account (Izyrn on Ely.by) gets the panel, whatever V-Client account is signed in.
+        if (account == null || !settings.isAdmin(account) || token.isBlank() || !client.configured()) return box;
 
         Label summary = label("Loading players…", 12, "#e6ebf7");
         TextField search = new TextField();

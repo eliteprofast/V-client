@@ -1,10 +1,10 @@
 {
-    "version":  "1.4.1",
+    "version":  "1.4.2",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "f36e3ac3535f50eca9ba63c820f57f28199064e5030238311a33f7db31bc9ecc",
-    "size":  63098368,
-    "notes":  "Fixes unlocked cosmetics not showing for offline accounts in the launcher\u0027s Cosmetics page; admin panel; uninstall entry.",
+    "sha256":  "0f786ddc114034b2927f67a63c100029268c0a4290ef1e928344db43142eb600",
+    "size":  63099904,
+    "notes":  "V-Client sign-in is now per game account, and the admin panel only appears on the admin account.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-19T14:33:49.9840873Z"
+    "publishedAt":  "2026-10-19T14:58:44.9925324Z"
 }

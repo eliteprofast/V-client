@@ -113,4 +113,23 @@ final class LauncherSettingsTest {
         assertEquals(LauncherSettings.privateMinecraftDirectory(appData),
                 LauncherSettings.migrateLegacyDirectory(normalized, appData));
     }
+
+    @Test
+    void v_client_sign_in_belongs_to_one_game_account() {
+        LauncherSettings settings = LauncherSettings.defaults(java.nio.file.Path.of("minecraft"));
+        settings.setLastAccountId("ely:izyrn");
+        settings.setBackendToken("admin-token");
+        assertEquals("admin-token", settings.backendToken());
+
+        settings.setLastAccountId("offline:Nyrox");
+        assertEquals("", settings.backendToken(), "another game account must not inherit the sign-in");
+        settings.setBackendToken("nyrox-token");
+
+        settings.setLastAccountId("ely:izyrn");
+        assertEquals("admin-token", settings.backendToken());
+        settings.setBackendToken("");
+        assertEquals("", settings.backendToken());
+        settings.setLastAccountId("offline:Nyrox");
+        assertEquals("nyrox-token", settings.backendToken());
+    }
 }

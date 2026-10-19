@@ -22,7 +22,8 @@ final class LauncherSettings {
     private String discordInvite;
     private boolean offlineMode;
     private String backendUrl = "";
-    private String backendToken = "";
+    /** V-Client account session per game account, so signing in as one player never signs in the others. */
+    private final java.util.Map<String, String> backendTokens = new java.util.LinkedHashMap<>();
     private String installId = "";
     private boolean autoUpdate = true;
     /** Logs every backend request with its URL, status and stack traces of failures. */
@@ -77,7 +78,15 @@ final class LauncherSettings {
         if (BackendClient.normalize(settings.backendUrl).equalsIgnoreCase(AppInfo.RETIRED_BACKEND_URL)) {
             settings.backendUrl = "";
         }
-        settings.backendToken = saved.path("backendToken").asText("");
+        saved.path("backendTokens").fields().forEachRemaining(entry -> {
+            if (!entry.getValue().asText("").isBlank()) settings.backendTokens.put(entry.getKey(), entry.getValue().asText());
+        });
+        // Older versions kept one session for the whole launcher; give it to the account that was active then.
+        String legacyToken = saved.path("backendToken").asText("");
+        if (!legacyToken.isBlank() && settings.backendTokens.isEmpty() && settings.lastAccountId != null
+                && !settings.lastAccountId.isBlank()) {
+            settings.backendTokens.put(settings.lastAccountId, legacyToken);
+        }
         settings.autoUpdate = saved.path("autoUpdate").asBoolean(true);
         settings.debugMode = saved.path("debugMode").asBoolean(false);
         settings.boostEnabled = saved.path("boostEnabled").asBoolean(false);
@@ -127,7 +136,8 @@ final class LauncherSettings {
         saved.put("discordInvite", discordInvite);
         saved.put("offlineMode", offlineMode);
         saved.put("backendUrl", backendUrl);
-        saved.put("backendToken", backendToken);
+        ObjectNode tokens = saved.putObject("backendTokens");
+        backendTokens.forEach(tokens::put);
         saved.put("autoUpdate", autoUpdate);
         saved.put("debugMode", debugMode);
         saved.put("boostEnabled", boostEnabled);
@@ -221,13 +231,15 @@ final class LauncherSettings {
         this.backendUrl = backendUrl == null ? "" : backendUrl;
     }
 
-    /** Session token for the player's V-Client account; empty when signed out. */
+    /** Session token of the V-Client account signed in for the active game account; empty when signed out. */
     String backendToken() {
-        return backendToken;
+        return backendTokens.getOrDefault(lastAccountId == null ? "" : lastAccountId, "");
     }
 
     void setBackendToken(String backendToken) {
-        this.backendToken = backendToken == null ? "" : backendToken;
+        String key = lastAccountId == null ? "" : lastAccountId;
+        if (backendToken == null || backendToken.isBlank()) backendTokens.remove(key);
+        else if (!key.isBlank()) backendTokens.put(key, backendToken);
     }
 
     /** Random id for anonymous usage counts. It is not derived from the PC or the player. */
