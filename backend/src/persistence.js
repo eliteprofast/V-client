@@ -12,7 +12,7 @@ const path = require('node:path');
  *
  * Without them nothing changes. Tables are restored in this order so references line up.
  */
-const TABLES = ['users', 'news', 'announcements', 'cosmetics', 'friendships', 'cosmetic_grants'];
+const TABLES = ['users', 'news', 'announcements', 'cosmetics', 'friendships', 'cosmetic_grants', 'players'];
 const BACKUP_FILE = 'vclient-backup.json';
 const SAVE_INTERVAL_MS = 15_000;
 

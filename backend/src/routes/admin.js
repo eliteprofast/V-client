@@ -23,6 +23,27 @@ function adminRoutes(ctx) {
   const router = express.Router();
   router.use(requireAdmin(ctx));
 
+  // ---- Players ----------------------------------------------------------
+  // Everyone whose launcher started the game, newest first, with how many cosmetics were granted to them.
+  router.get('/players', (req, res) => {
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 500);
+    const search = String(req.query.q || '').trim().slice(0, 32).replace(/[%_]/g, '');
+    const rows = db.prepare(
+      `SELECT p.*, (SELECT COUNT(*) FROM cosmetic_grants g WHERE g.player_uuid = p.uuid) AS grants
+       FROM players p WHERE p.name LIKE ? ORDER BY p.last_seen DESC LIMIT ?`,
+    ).all(`%${search}%`, limit);
+    const t = now();
+    res.json({
+      total: db.prepare('SELECT COUNT(*) AS n FROM players').get().n,
+      activeToday: db.prepare('SELECT COUNT(*) AS n FROM players WHERE last_seen >= ?').get(t - 86400).n,
+      accounts: db.prepare('SELECT COUNT(*) AS n FROM users').get().n,
+      items: rows.map((r) => ({
+        uuid: r.uuid, name: r.name, accountType: r.account_type, version: r.version, launches: r.launches, grants: r.grants,
+        firstSeen: new Date(r.first_seen * 1000).toISOString(), lastSeen: new Date(r.last_seen * 1000).toISOString(),
+      })),
+    });
+  });
+
   // ---- News -------------------------------------------------------------
   router.get('/news', (req, res) => {
     res.json({ items: db.prepare('SELECT * FROM news ORDER BY created_at DESC, id DESC').all().map((r) => ({ ...newsView(r), published: !!r.published })) });

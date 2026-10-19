@@ -286,3 +286,20 @@ test('friends: request, accept, presence, decline and remove', async (t) => {
   assert.equal((await call('GET', '/api/friends', { token: bob })).json.friends.length, 0);
   assert.equal((await call('DELETE', `/api/friends/${bobId}`, { token: alice })).status, 404);
 });
+
+test('players: the launcher reports who plays, only admins can list them', async (t) => {
+  const { call, admin } = await start(t);
+  const uuid = '3bf39b66aa3832a9b8c955a490978486';
+  assert.equal((await call('POST', '/api/players/seen', { body: { uuid, name: 'NyroxPlayZ', accountType: 'offline', version: '1.3.0' } })).status, 202);
+  assert.equal((await call('POST', '/api/players/seen', { body: { uuid, name: 'NyroxPlayZ', accountType: 'offline', version: '1.3.0' } })).status, 202);
+  assert.equal((await call('POST', '/api/players/seen', { body: { uuid: 'nope', name: 'x' } })).status, 400);
+  assert.equal((await call('GET', '/api/admin/players')).status, 401);
+  const list = await call('GET', '/api/admin/players?q=nyrox', { token: admin });
+  assert.equal(list.status, 200);
+  assert.equal(list.json.items.length, 1);
+  assert.equal(list.json.items[0].name, 'NyroxPlayZ');
+  assert.equal(list.json.items[0].launches, 2);
+  assert.equal(list.json.total, 1);
+  await call('POST', '/api/admin/cosmetics/grants', { token: admin, body: { uuid, cosmeticId: 'ice_cape' } });
+  assert.equal((await call('GET', '/api/admin/players', { token: admin })).json.items[0].grants, 1);
+});

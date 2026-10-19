@@ -103,6 +103,16 @@ function openDatabase(dataDir) {
       size INTEGER NOT NULL,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS players (
+      uuid TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      account_type TEXT NOT NULL DEFAULT 'offline',
+      version TEXT NOT NULL DEFAULT '',
+      first_seen INTEGER NOT NULL,
+      last_seen INTEGER NOT NULL,
+      launches INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE INDEX IF NOT EXISTS players_last_seen ON players (last_seen);
     CREATE TABLE IF NOT EXISTS cosmetic_grants (
       player_uuid TEXT NOT NULL,
       cosmetic_id TEXT NOT NULL,

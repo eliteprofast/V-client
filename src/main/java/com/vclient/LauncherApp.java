@@ -1597,6 +1597,257 @@ public final class LauncherApp extends Application {
     }
 
     /** A box that fills itself with active announcements; stays empty when the backend is unavailable. */
+    /** Tells the backend which account is playing so admins can find the player later; never blocks or fails the launch. */
+    private void recordPlayerAsync(PlayerAccount player) {
+        BackendClient client = backend();
+        if (player == null || !client.configured() || settings.offlineMode()) return;
+        String type = switch (player.type()) {
+            case MICROSOFT -> "microsoft";
+            case ELY_BY -> "ely_by";
+            case OFFLINE -> "offline";
+        };
+        executor.execute(() -> client.recordPlayer(player.uuid(), player.name(), type));
+    }
+
+    private static String timeAgo(String iso) {
+        try {
+            long seconds = Math.max(0, java.time.Duration.between(java.time.Instant.parse(iso), java.time.Instant.now()).getSeconds());
+            if (seconds < 90) return "just now";
+            if (seconds < 3600) return seconds / 60 + " min ago";
+            if (seconds < 86400) return seconds / 3600 + " h ago";
+            return seconds / 86400 + " d ago";
+        } catch (java.time.format.DateTimeParseException e) {
+            return "";
+        }
+    }
+
+    /** The admin panel on the News page: only shown (and only works) when the signed-in V-Client account is the admin. */
+    private VBox adminCard() {
+        VBox box = card();
+        box.setManaged(false);
+        box.setVisible(false);
+        BackendClient client = backend();
+        String token = settings.backendToken();
+        if (token.isBlank() || !client.configured()) return box;
+
+        Label summary = label("Loading players…", 12, "#e6ebf7");
+        TextField search = new TextField();
+        search.setPromptText("Search players by name");
+        search.setStyle(fieldStyle());
+        HBox.setHgrow(search, Priority.ALWAYS);
+        Button refresh = button("REFRESH", "#292642", 10);
+        HBox searchRow = new HBox(10, search, refresh);
+        searchRow.setAlignment(Pos.CENTER_LEFT);
+        VBox rows = new VBox(8);
+        TextField byName = new TextField();
+        byName.setPromptText("Player name (even if they have not played yet)");
+        byName.setStyle(fieldStyle());
+        HBox.setHgrow(byName, Priority.ALWAYS);
+        Button grantByName = button("UNLOCK FOR A NAME", ACCENT, 10);
+        HBox nameRow = new HBox(10, byName, grantByName);
+        nameRow.setAlignment(Pos.CENTER_LEFT);
+        box.getChildren().addAll(label("ADMIN PANEL", 11, ACCENT), summary, searchRow, rows,
+                label("Not in the list yet?", 11, MUTED), nameRow);
+
+        Runnable load = () -> {
+            summary.setText("Loading players…");
+            executor.execute(() -> {
+                try {
+                    BackendClient.AdminOverview overview = client.adminPlayers(token, search.getText().trim());
+                    Platform.runLater(() -> {
+                        summary.setText(overview.total() + " players have played  ·  " + overview.activeToday()
+                                + " in the last 24 hours  ·  " + overview.accounts() + " V-Client accounts");
+                        rows.getChildren().clear();
+                        if (overview.players().isEmpty()) {
+                            rows.getChildren().add(label("No players found yet. They appear here after they start the game from V-Client 1.3.0 or newer.", 12, MUTED));
+                        }
+                        for (BackendClient.AdminPlayer player : overview.players()) {
+                            Label name = label(player.name(), 13, "#f3f6fc");
+                            name.setStyle(name.getStyle() + "-fx-font-weight: bold;");
+                            Label kind = ModsUi.chip(switch (player.accountType()) {
+                                case "ely_by" -> "ELY.BY";
+                                case "microsoft" -> "PREMIUM";
+                                default -> "OFFLINE";
+                            }, ModsUi.MUTED);
+                            Label seen = label(timeAgo(player.lastSeen()) + "  ·  " + player.launches() + " launches"
+                                    + (player.grants() > 0 ? "  ·  " + player.grants() + " unlocked" : ""), 11, MUTED);
+                            Region spacer = new Region();
+                            HBox.setHgrow(spacer, Priority.ALWAYS);
+                            Button manage = button("UNLOCK", "#292642", 10);
+                            manage.setOnAction(event -> openGrantDialog(client, token, player.name(), player.uuid(), refresh::fire));
+                            HBox row = new HBox(10, name, kind, seen, spacer, manage);
+                            row.setAlignment(Pos.CENTER_LEFT);
+                            rows.getChildren().add(row);
+                        }
+                    });
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    Platform.runLater(() -> summary.setText("Could not load players: " + e.getMessage()));
+                }
+            });
+        };
+        refresh.setOnAction(event -> load.run());
+        search.setOnAction(event -> load.run());
+        grantByName.setOnAction(event -> {
+            String typed = byName.getText().trim();
+            if (typed.isEmpty()) return;
+            openGrantDialog(client, token, typed, typed, load);
+        });
+        executor.execute(() -> {
+            try {
+                if (client.isAdmin(token)) {
+                    Platform.runLater(() -> {
+                        box.setManaged(true);
+                        box.setVisible(true);
+                        load.run();
+                    });
+                }
+            } catch (IOException | InterruptedException e) {
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            }
+        });
+        return box;
+    }
+
+    /** Dialog that unlocks or removes cosmetics, or gives an invite reward, for one player (a name or a UUID). */
+    private void openGrantDialog(BackendClient client, String token, String displayName, String player, Runnable onChanged) {
+        java.util.Map<String, String> names = new java.util.HashMap<>();
+        for (CosmeticsStore.Item item : CosmeticsStore.builtIn()) names.put(item.id(), item.name());
+        java.util.function.Function<String, String> nameOf = id -> names.getOrDefault(id, id);
+
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.initOwner(stage);
+        dialog.setTitle("Unlock cosmetics");
+        dialog.setHeaderText(displayName);
+        dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
+        dialog.getDialogPane().setPrefWidth(560);
+
+        Label owned = label("Loading what they have…", 12, "#e6ebf7");
+        owned.setWrapText(true);
+        Label result = label("", 12, MUTED);
+        result.setWrapText(true);
+
+        ComboBox<CosmeticsStore.Item> cosmetic = new ComboBox<>();
+        cosmetic.setMaxWidth(Double.MAX_VALUE);
+        cosmetic.getItems().addAll(CosmeticsStore.builtIn().stream().filter(item -> !"free".equals(item.tier())).toList());
+        cosmetic.setConverter(new javafx.util.StringConverter<>() {
+            @Override public String toString(CosmeticsStore.Item item) {
+                return item == null ? "" : item.name() + "  —  " + item.category() + " (" + item.tier() + ")";
+            }
+            @Override public CosmeticsStore.Item fromString(String text) { return null; }
+        });
+        cosmetic.setPromptText("Choose a cosmetic");
+        Button unlock = button("UNLOCK", ACCENT, 10);
+        Button revoke = button("TAKE AWAY", "#482332", 10);
+        HBox cosmeticRow = new HBox(10, cosmetic, unlock, revoke);
+        HBox.setHgrow(cosmetic, Priority.ALWAYS);
+        cosmeticRow.setAlignment(Pos.CENTER_LEFT);
+
+        ComboBox<BackendClient.AdminReward> reward = new ComboBox<>();
+        reward.setMaxWidth(Double.MAX_VALUE);
+        reward.setPromptText("Invite reward");
+        reward.setConverter(new javafx.util.StringConverter<>() {
+            @Override public String toString(BackendClient.AdminReward value) {
+                return value == null ? "" : value.invites() + " invites  —  "
+                        + value.cosmetics().stream().map(nameOf).collect(java.util.stream.Collectors.joining(", "));
+            }
+            @Override public BackendClient.AdminReward fromString(String text) { return null; }
+        });
+        Button giveReward = button("GIVE REWARD", ACCENT, 10);
+        HBox rewardRow = new HBox(10, reward, giveReward);
+        HBox.setHgrow(reward, Priority.ALWAYS);
+        rewardRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox content = new VBox(10, label("UNLOCKED NOW", 11, MUTED), owned, label("UNLOCK ONE COSMETIC", 11, MUTED), cosmeticRow,
+                label("INVITE REWARD (includes every tier below it)", 11, MUTED), rewardRow, result);
+        content.setPadding(new Insets(14));
+        content.setStyle("-fx-background-color: #101321;");
+        dialog.getDialogPane().setStyle("-fx-background-color: #101321;");
+        dialog.getDialogPane().setContent(content);
+
+        java.util.concurrent.atomic.AtomicReference<List<String>> uuids = new java.util.concurrent.atomic.AtomicReference<>(List.of());
+        Runnable showOwned = () -> executor.execute(() -> {
+            try {
+                List<String> lines = new ArrayList<>();
+                for (String uuid : uuids.get()) {
+                    List<String> ids = client.adminGrants(token, uuid);
+                    lines.add(ids.isEmpty() ? "Nothing granted yet." : ids.stream().map(nameOf).collect(java.util.stream.Collectors.joining(", ")));
+                }
+                Platform.runLater(() -> owned.setText(String.join("   |   ", lines)));
+            } catch (IOException | InterruptedException e) {
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                Platform.runLater(() -> owned.setText("Could not load: " + e.getMessage()));
+            }
+        });
+        java.util.function.Consumer<String> fail = message -> Platform.runLater(() -> {
+            result.setStyle("-fx-text-fill: #ff9aa5; -fx-font-size: 12px;");
+            result.setText(message);
+        });
+        java.util.function.Consumer<String> ok = message -> Platform.runLater(() -> {
+            result.setStyle("-fx-text-fill: #6fd39b; -fx-font-size: 12px;");
+            result.setText(message);
+            onChanged.run();
+        });
+
+        executor.execute(() -> {
+            try {
+                // A name can be an offline account and an Ely.by account (different UUIDs); the backend returns both.
+                uuids.set(client.adminGrant(token, player, null, 0).uuids());
+                List<BackendClient.AdminReward> rewards = client.adminRewards(token);
+                Platform.runLater(() -> reward.getItems().setAll(rewards));
+                showOwned.run();
+            } catch (IOException | InterruptedException e) {
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                fail.accept(e.getMessage());
+            }
+        });
+
+        unlock.setOnAction(event -> {
+            CosmeticsStore.Item item = cosmetic.getValue();
+            if (item == null) return;
+            executor.execute(() -> {
+                try {
+                    client.adminGrant(token, player, item.id(), null);
+                    ok.accept("Unlocked " + item.name() + " for " + displayName + ". They see it after restarting the game or pressing Refresh in the Cosmetics menu.");
+                    showOwned.run();
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    fail.accept(e.getMessage());
+                }
+            });
+        });
+        revoke.setOnAction(event -> {
+            CosmeticsStore.Item item = cosmetic.getValue();
+            if (item == null) return;
+            executor.execute(() -> {
+                try {
+                    for (String uuid : uuids.get()) client.adminRevoke(token, uuid, item.id());
+                    ok.accept("Took " + item.name() + " away from " + displayName + ".");
+                    showOwned.run();
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    fail.accept(e.getMessage());
+                }
+            });
+        });
+        giveReward.setOnAction(event -> {
+            BackendClient.AdminReward tier = reward.getValue();
+            if (tier == null) return;
+            executor.execute(() -> {
+                try {
+                    BackendClient.GrantResult granted = client.adminGrant(token, player, null, tier.invites());
+                    ok.accept("Gave the " + tier.invites() + "-invite reward to " + displayName + ": "
+                            + granted.granted().stream().map(nameOf).collect(java.util.stream.Collectors.joining(", ")) + ".");
+                    showOwned.run();
+                } catch (IOException | InterruptedException e) {
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    fail.accept(e.getMessage());
+                }
+            });
+        });
+        dialog.show();
+    }
+
     private static final java.time.LocalDate LAUNCH_DATE = java.time.LocalDate.of(2026, 11, 10);
 
     /** The built-in launch-event notice: always shown, needs no backend. */
@@ -1707,7 +1958,7 @@ public final class LauncherApp extends Application {
             posts.getChildren().add(label("Set the V-Client backend address below to load news.", 12, MUTED));
         }
 
-        content.getChildren().addAll(launchEventBanner(), announcementBox(), statusCard, posts, accountCard(root), backendCard());
+        content.getChildren().addAll(launchEventBanner(), announcementBox(), statusCard, posts, accountCard(root), adminCard(), backendCard());
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
     }
@@ -2049,6 +2300,7 @@ public final class LauncherApp extends Application {
 
     private void startBackendTasks() {
         reportEventAsync("launch");
+        recordPlayerAsync(account);
         startPresence();
         if (settings.autoUpdate()) checkForUpdates(false);
     }
@@ -3074,6 +3326,7 @@ public final class LauncherApp extends Application {
         MinecraftLauncher.InstalledVersion selected = choice.installed();
         PlayerAccount selectedAccount = account;
         reportEventAsync(joinSmp ? "join" : "play");
+        recordPlayerAsync(selectedAccount);
         boolean offline = settings.offlineMode();
         Button launchingButton = joinSmp ? singleplayerButton : playButton;
         playButton.setDisable(true);

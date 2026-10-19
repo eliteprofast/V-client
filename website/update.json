@@ -1,10 +1,10 @@
 {
-    "version":  "1.3.0",
+    "version":  "1.4.0",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "482166242816d60a37e18f4dec64ddab30a711fdb2b7328ca658d02fcb41429c",
-    "size":  63080448,
-    "notes":  "Adds an Uninstall entry (Settings \u003e Apps and Start menu), Start menu and desktop shortcuts, cosmetics locked (1 free per tab), invite rewards and launch-event cosmetics.",
+    "sha256":  "46ae67346981dfdfe9c5ba8be4de4f24b0bdb13ac8d457f7242baf9398464936",
+    "size":  63098880,
+    "notes":  "New admin panel in the News page (players who played, unlock cosmetics), plus an Uninstall entry and fixes.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-19T10:59:41.8166490Z"
+    "publishedAt":  "2026-10-19T14:20:19.4427743Z"
 }

@@ -223,6 +223,83 @@ final class BackendClient {
         send("PUT", "/api/presence", body, token);
     }
 
+    // ---- Admin panel: players who have played, and cosmetic grants ----------------------------------
+
+    record AdminPlayer(String uuid, String name, String accountType, String lastSeen, int launches, int grants) {}
+
+    record AdminOverview(int total, int activeToday, int accounts, List<AdminPlayer> players) {}
+
+    record AdminReward(int invites, List<String> cosmetics) {}
+
+    record GrantResult(List<String> uuids, List<String> granted) {}
+
+    /** Tells the backend which account started the game; failures are ignored because it only feeds the admin list. */
+    void recordPlayer(String uuid, String name, String accountType) {
+        if (!configured() || uuid == null || uuid.isBlank() || name == null || name.isBlank()) return;
+        try {
+            ObjectNode body = JSON.createObjectNode().put("uuid", uuid.replace("-", "")).put("name", name)
+                    .put("accountType", accountType).put("version", AppInfo.VERSION);
+            send("POST", "/api/players/seen", body, null);
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+        }
+    }
+
+    boolean isAdmin(String token) throws IOException, InterruptedException {
+        return "admin".equals(send("GET", "/api/auth/me", null, token).path("user").path("role").asText(""));
+    }
+
+    AdminOverview adminPlayers(String token, String query) throws IOException, InterruptedException {
+        JsonNode root = send("GET", "/api/admin/players?limit=200&q=" + encode(query == null ? "" : query), null, token);
+        List<AdminPlayer> players = new ArrayList<>();
+        for (JsonNode node : root.path("items")) {
+            players.add(new AdminPlayer(node.path("uuid").asText(), node.path("name").asText(), node.path("accountType").asText(),
+                    node.path("lastSeen").asText(""), node.path("launches").asInt(), node.path("grants").asInt()));
+        }
+        return new AdminOverview(root.path("total").asInt(), root.path("activeToday").asInt(), root.path("accounts").asInt(),
+                List.copyOf(players));
+    }
+
+    /** Ids of the cosmetics granted to one UUID. */
+    List<String> adminGrants(String token, String uuid) throws IOException, InterruptedException {
+        List<String> ids = new ArrayList<>();
+        for (JsonNode node : send("GET", "/api/admin/cosmetics/grants?uuid=" + encode(uuid), null, token).path("items")) {
+            ids.add(node.path("cosmeticId").asText());
+        }
+        return ids;
+    }
+
+    /** Grants one cosmetic, or an invite-reward tier when {@code invites} is not null, to a player name or UUID. */
+    GrantResult adminGrant(String token, String player, String cosmeticId, Integer invites) throws IOException, InterruptedException {
+        ObjectNode body = JSON.createObjectNode().put("player", player);
+        if (invites != null) body.put("invites", invites);
+        else body.put("cosmeticId", cosmeticId);
+        JsonNode root = send("POST", "/api/admin/cosmetics/grants", body, token);
+        List<String> uuids = new ArrayList<>();
+        root.path("uuids").forEach(node -> uuids.add(node.asText()));
+        List<String> granted = new ArrayList<>();
+        root.path("granted").forEach(node -> granted.add(node.asText()));
+        return new GrantResult(List.copyOf(uuids), List.copyOf(granted));
+    }
+
+    void adminRevoke(String token, String uuid, String cosmeticId) throws IOException, InterruptedException {
+        try {
+            send("DELETE", "/api/admin/cosmetics/grants", JSON.createObjectNode().put("uuid", uuid).put("cosmeticId", cosmeticId), token);
+        } catch (BackendException e) {
+            if (!e.getMessage().toLowerCase().contains("not found")) throw e;
+        }
+    }
+
+    List<AdminReward> adminRewards(String token) throws IOException, InterruptedException {
+        List<AdminReward> rewards = new ArrayList<>();
+        for (JsonNode node : send("GET", "/api/admin/cosmetics/rewards", null, token).path("items")) {
+            List<String> ids = new ArrayList<>();
+            node.path("cosmetics").forEach(id -> ids.add(id.asText()));
+            rewards.add(new AdminReward(node.path("invites").asInt(), List.copyOf(ids)));
+        }
+        return rewards;
+    }
+
     private Session session(JsonNode root) {
         JsonNode user = root.path("user");
         return new Session(root.path("token").asText(), user.path("username").asText(),
