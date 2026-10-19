@@ -10,6 +10,7 @@ internal static class StandaloneInstaller
 {
     private const string PayloadResource = "VSMPClient.Payload.zip";
     private const string ExecutableName = "V-Client.exe";
+    private const string UninstallResource = "VSMPClient.Uninstall.ps1";
 
     [STAThread]
     private static int Main(string[] args)
@@ -36,6 +37,7 @@ internal static class StandaloneInstaller
 
             RunWithProgress(installDirectory);
             CreateShortcuts(installDirectory, executablePath);
+            RegisterUninstaller(installDirectory, executablePath);
             Process.Start(new ProcessStartInfo
             {
                 FileName = executablePath,
@@ -251,6 +253,41 @@ internal static class StandaloneInstaller
             string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             WriteShortcut(Path.Combine(startMenu, "V-Client.lnk"), installDirectory, executablePath);
             WriteShortcut(Path.Combine(desktop, "V-Client.lnk"), installDirectory, executablePath);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    /// <summary>Lists V-Client in Settings > Apps and Start with an Uninstall command. Never fails the install.</summary>
+    private static void RegisterUninstaller(string installDirectory, string executablePath)
+    {
+        try
+        {
+            string script = Path.Combine(installDirectory, "uninstall.ps1");
+            using (Stream resource = Assembly.GetExecutingAssembly().GetManifestResourceStream(UninstallResource))
+            {
+                if (resource == null) return;
+                using (FileStream output = new FileStream(script, FileMode.Create, FileAccess.Write))
+                {
+                    resource.CopyTo(output);
+                }
+            }
+
+            string command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + script
+                + "\" -InstallDir \"" + installDirectory + "\"";
+            using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Uninstall\VSMPClient"))
+            {
+                key.SetValue("DisplayName", "V-Client");
+                key.SetValue("Publisher", "VSMP");
+                key.SetValue("DisplayIcon", executablePath + ",0");
+                key.SetValue("InstallLocation", installDirectory);
+                key.SetValue("UninstallString", command);
+                key.SetValue("NoModify", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                key.SetValue("NoRepair", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                key.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"));
+            }
         }
         catch (Exception)
         {

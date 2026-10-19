@@ -4,10 +4,11 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $compiler = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $source = Join-Path $PSScriptRoot "StandaloneInstaller.cs"
 $payload = Join-Path $repoRoot "AzyrClient.zip"
+$uninstallScript = Join-Path $PSScriptRoot "uninstall.ps1"
 $icon = Join-Path $repoRoot "src\main\resources\vclient.ico"
 $output = Join-Path $repoRoot "website\VSMPClientSetup.exe"
 
-foreach ($path in @($compiler, $source, $payload, $icon)) {
+foreach ($path in @($compiler, $source, $payload, $icon, $uninstallScript)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Required installer input is missing: $path"
     }
@@ -23,6 +24,7 @@ foreach ($path in @($compiler, $source, $payload, $icon)) {
     /reference:System.Windows.Forms.dll `
     /reference:System.Drawing.dll `
     /resource:$payload,VSMPClient.Payload.zip `
+    /resource:$uninstallScript,VSMPClient.Uninstall.ps1 `
     /out:$output `
     $source
 if ($LASTEXITCODE -ne 0) {
