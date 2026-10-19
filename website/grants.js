@@ -75,27 +75,32 @@ async function showOwned() {
   if (!player) return say("Enter a player first.", false);
   try {
     // Granting nothing resolves the name; use the grants list for the UUID once we have it.
-    const uuid = await resolve(player);
-    const data = await call("GET", `/admin/cosmetics/grants?uuid=${uuid}`);
-    const owned = data.items.length ? data.items.map((item) => label(item.cosmeticId)).join(", ") : "Nothing granted yet.";
-    $("owned").textContent = uuid === ADMIN_UUID ? "Admin account: every cosmetic is unlocked automatically. " + owned : owned;
-    say(`Player ${uuid}`, true);
+    const uuids = await resolve(player);
+    const lines = [];
+    for (const uuid of uuids) {
+      const data = await call("GET", `/admin/cosmetics/grants?uuid=${uuid}`);
+      const owned = data.items.length ? data.items.map((item) => label(item.cosmeticId)).join(", ") : "Nothing granted yet.";
+      lines.push(`${uuids.length > 1 ? uuid.slice(0, 8) + "…: " : ""}${uuid === ADMIN_UUID ? "Admin account: every cosmetic is unlocked automatically. " : ""}${owned}`);
+    }
+    $("owned").textContent = lines.join("  |  ");
+    say(`Player ${uuids.join(" and ")}`, true);
   } catch (error) {
     say(error.message, false);
   }
 }
 
+// A name can be an offline account and an Ely.by account, which have different UUIDs; both are returned.
 async function resolve(player) {
   const compact = player.replace(/-/g, "").toLowerCase();
-  if (/^[0-9a-f]{32}$/.test(compact)) return compact;
+  if (/^[0-9a-f]{32}$/.test(compact)) return [compact];
   const data = await call("POST", "/admin/cosmetics/grants", { player, invites: 0 });
-  return data.uuid;
+  return data.uuids;
 }
 
 async function grant() {
   try {
     const data = await call("POST", "/admin/cosmetics/grants", { player: $("player").value.trim(), cosmeticId: $("cosmetic").value });
-    say(`Unlocked ${label(data.cosmeticId)} for ${data.uuid}`, true);
+    say(`Unlocked ${label(data.cosmeticId)} for ${data.uuids.length > 1 ? "both accounts of " : ""}${$("player").value.trim()} (${data.uuids.join(", ")})`, true);
     showOwned();
   } catch (error) {
     say(error.message, false);
@@ -104,9 +109,15 @@ async function grant() {
 
 async function revoke() {
   try {
-    const uuid = await resolve($("player").value.trim());
-    await call("DELETE", "/admin/cosmetics/grants", { uuid, cosmeticId: $("cosmetic").value });
-    say(`Took ${label($("cosmetic").value)} away from ${uuid}`, true);
+    const uuids = await resolve($("player").value.trim());
+    for (const uuid of uuids) {
+      try {
+        await call("DELETE", "/admin/cosmetics/grants", { uuid, cosmeticId: $("cosmetic").value });
+      } catch (error) {
+        if (!/not found/i.test(error.message)) throw error;
+      }
+    }
+    say(`Took ${label($("cosmetic").value)} away from ${uuids.join(" and ")}`, true);
     showOwned();
   } catch (error) {
     say(error.message, false);
@@ -116,7 +127,7 @@ async function revoke() {
 async function reward() {
   try {
     const data = await call("POST", "/admin/cosmetics/grants", { player: $("player").value.trim(), invites: Number($("invites").value) });
-    say(`Gave ${data.granted.map(label).join(", ")} to ${data.uuid}`, true);
+    say(`Gave ${data.granted.map(label).join(", ")} to ${data.uuids.join(" and ")}`, true);
     showOwned();
   } catch (error) {
     say(error.message, false);

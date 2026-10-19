@@ -189,21 +189,35 @@ cosmeticsRoutes.admin = (ctx) => {
     res.json({ items: rows.map((r) => ({ uuid: r.player_uuid, cosmeticId: r.cosmetic_id, grantedAt: new Date(r.granted_at * 1000).toISOString() })) });
   });
 
-  /** A player is a 32-hex UUID, or an Ely.by name that is looked up. Returns the UUID or null. */
+  /** The UUID Minecraft gives an offline (no-login) player: an MD5 of "OfflinePlayer:<name>" as a version-3 UUID. */
+  function offlineUuid(name) {
+    const hash = crypto.createHash('md5').update('OfflinePlayer:' + name, 'utf8').digest();
+    hash[6] = (hash[6] & 0x0f) | 0x30;
+    hash[8] = (hash[8] & 0x3f) | 0x80;
+    return hash.toString('hex');
+  }
+
+  /**
+   * A player is a 32-hex UUID, or a name. A name can belong to an offline account, an Ely.by account or both, and
+   * each has a different UUID, so every UUID the name can have is returned (empty when the input is not valid).
+   */
   async function resolvePlayer(value) {
     const text = String(value || '').trim();
     const compact = text.replace(/-/g, '').toLowerCase();
-    if (PLAYER_UUID.test(compact)) return compact;
-    if (!/^[A-Za-z0-9_]{3,16}$/.test(text)) return null;
+    if (PLAYER_UUID.test(compact)) return [compact];
+    if (!/^[A-Za-z0-9_]{3,16}$/.test(text)) return [];
+    const ids = [offlineUuid(text)];
     try {
       const response = await fetch('https://authserver.ely.by/api/users/profiles/minecraft/' + encodeURIComponent(text),
         { signal: AbortSignal.timeout(8000) });
-      if (!response.ok) return null;
-      const id = String((await response.json()).id || '').replace(/-/g, '').toLowerCase();
-      return PLAYER_UUID.test(id) ? id : null;
+      if (response.ok) {
+        const id = String((await response.json()).id || '').replace(/-/g, '').toLowerCase();
+        if (PLAYER_UUID.test(id) && !ids.includes(id)) ids.unshift(id);
+      }
     } catch {
-      return null;
+      // Ely.by unreachable: the offline UUID still works for offline accounts.
     }
+    return ids;
   }
 
   const grant = (uuid, cosmeticId) => db.prepare(
@@ -214,8 +228,8 @@ cosmeticsRoutes.admin = (ctx) => {
   // Grants one cosmetic (cosmeticId) or an invite-reward tier (invites: N). The player is a UUID or Ely.by name.
   // Ids need not be in the database: the built-in catalog ships inside the mod.
   router.post('/grants', async (req, res) => {
-    const uuid = await resolvePlayer(req.body?.player ?? req.body?.uuid);
-    if (!uuid) return res.status(400).json({ error: 'Unknown player: enter an Ely.by name or a Minecraft UUID' });
+    const uuids = await resolvePlayer(req.body?.player ?? req.body?.uuid);
+    if (!uuids.length) return res.status(400).json({ error: 'Unknown player: enter a player name or a Minecraft UUID' });
     let ids;
     if (req.body?.invites !== undefined) {
       const invites = Number(req.body.invites);
@@ -226,8 +240,8 @@ cosmeticsRoutes.admin = (ctx) => {
       if (!ID.test(cosmeticId)) return res.status(400).json({ error: 'cosmeticId is required' });
       ids = [cosmeticId];
     }
-    ids.forEach((id) => grant(uuid, id));
-    return res.status(201).json({ uuid, granted: ids, cosmeticId: ids[0] });
+    uuids.forEach((uuid) => ids.forEach((id) => grant(uuid, id)));
+    return res.status(201).json({ uuid: uuids[0], uuids, granted: ids, cosmeticId: ids[0] });
   });
 
   router.delete('/grants', (req, res) => {
