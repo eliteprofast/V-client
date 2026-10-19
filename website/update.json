@@ -1,10 +1,10 @@
 {
-    "version":  "1.4.0",
+    "version":  "1.4.1",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "46ae67346981dfdfe9c5ba8be4de4f24b0bdb13ac8d457f7242baf9398464936",
-    "size":  63098880,
-    "notes":  "New admin panel in the News page (players who played, unlock cosmetics), plus an Uninstall entry and fixes.",
+    "sha256":  "f36e3ac3535f50eca9ba63c820f57f28199064e5030238311a33f7db31bc9ecc",
+    "size":  63098368,
+    "notes":  "Fixes unlocked cosmetics not showing for offline accounts in the launcher\u0027s Cosmetics page; admin panel; uninstall entry.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-19T14:20:19.4427743Z"
+    "publishedAt":  "2026-10-19T14:33:49.9840873Z"
 }

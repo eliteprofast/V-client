@@ -1075,7 +1075,7 @@ public final class LauncherApp extends Application {
             refresh.setDisable(true);
             String uuid = account == null ? "" : account.uuid();
             boolean online = client.configured() && !settings.offlineMode();
-            boolean checkOwned = account != null && account.type() != PlayerAccount.Type.OFFLINE && !uuid.isBlank();
+            boolean checkOwned = account != null && !uuid.isBlank();
             appendLog("Cosmetics: loading the catalog (backend " + (client.configured() ? client.baseUrl() : "not set")
                     + ", " + (online ? "online" : "not contacting it") + ", account "
                     + (account == null ? "none" : account.name() + " / " + account.type().label()) + ").");

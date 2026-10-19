@@ -164,6 +164,7 @@ public final class CosmeticCatalog {
                         base + "/api/cosmetics/owned/" + player.toString().replace("-", "")), null);
                 if (ownedResponse.statusCode() == 200) {
                     owned = readOwned(new String(ownedResponse.body(), StandardCharsets.UTF_8));
+                    VClientMod.LOGGER.info("[Cosmetics] Unlocked for {}: {}", player, owned);
                     CosmeticNet.write(directory.resolve("owned.json"), ownedResponse.body());
                 } else {
                     VClientMod.LOGGER.warn("[Cosmetics] Owned-items request returned HTTP {}", ownedResponse.statusCode());
