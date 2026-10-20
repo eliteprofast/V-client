@@ -64,8 +64,18 @@ import java.util.function.Consumer;
 
 public final class LauncherApp extends Application {
     private enum Page {
-        HOME, LIBRARY, MODS, BOOST, WARDROBE, COSMETICS, FRIENDS, NEWS, LOGS, CONSOLE, SETTINGS, DISCORD
+        HOME, SERVERS, LIBRARY, MODS, BOOST, WARDROBE, COSMETICS, FRIENDS, NEWS, LOGS, CONSOLE, SETTINGS, DISCORD
     }
+
+    private record ServerEntry(String name, String host, int port) {}
+
+    // VSMP's address: change it here when it moves (JOIN OUR SMP and the Servers page both use it).
+    private static final String VSMP_HOST = "neuron.zeroxhost.space";
+    private static final int VSMP_PORT = 19145;
+    private static final List<ServerEntry> SERVER_LIST = List.of(
+            new ServerEntry("VSMP", VSMP_HOST, VSMP_PORT),
+            new ServerEntry("LifeAMC", "play.lifeamc.fun", 25565),
+            new ServerEntry("WSMP", "play.wsmp.fun", 25565));
 
     private record VersionChoice(String id, String label, String status,
                                  MinecraftLauncher.AvailableVersion available,
@@ -250,12 +260,12 @@ public final class LauncherApp extends Application {
         playButton.setPrefHeight(54);
         HBox.setHgrow(playButton, Priority.ALWAYS);
         playButton.setMaxWidth(Double.MAX_VALUE);
-        playButton.setOnAction(event -> launchGame(false));
+        playButton.setOnAction(event -> launchGame(null));
         singleplayerButton = button("JOIN OUR SMP", "#292642", 14);
         singleplayerButton.setPrefHeight(54);
         singleplayerButton.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(singleplayerButton, Priority.ALWAYS);
-        singleplayerButton.setOnAction(event -> launchGame(true));
+        singleplayerButton.setOnAction(event -> launchGame(SERVER_LIST.getFirst()));
         Button settingsButton = button("SETTINGS", "#292642", 12);
         settingsButton.setPrefHeight(54);
         settingsButton.setOnAction(event -> showSettings());
@@ -1916,6 +1926,59 @@ public final class LauncherApp extends Application {
         });
     }
 
+    private void showServers() {
+        activePage = Page.SERVERS;
+        settingsPage = false;
+        updateNavigationState();
+        StackPane root = baseLayout();
+        VBox content = pageContent("Multiplayer", "Servers", "Live status of our servers, pinged straight from your PC. Press JOIN to launch the selected version and connect.");
+        List<Runnable> refreshers = new ArrayList<>();
+        Button refreshAll = button("REFRESH ALL", "#292642", 10);
+        refreshAll.setOnAction(event -> refreshers.forEach(Runnable::run));
+        content.getChildren().add(refreshAll);
+        for (ServerEntry server : SERVER_LIST) {
+            VBox box = card();
+            Region indicator = dot("#64728a");
+            Label name = label(server.name(), 17, "#f3f6fc");
+            String address = server.port() == 25565 ? server.host() : server.host() + ":" + server.port();
+            Label addressLabel = label(address, 11, MUTED);
+            Label state = label("Pinging…", 12, "#b3c0d3");
+            Label motd = label("", 11, "#c3bfdc");
+            motd.setWrapText(true);
+            motd.managedProperty().bind(motd.visibleProperty());
+            motd.setVisible(false);
+            Button join = button("JOIN", ACCENT, 12);
+            join.setOnAction(event -> launchGame(server));
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            HBox header = new HBox(10, indicator, new VBox(2, name, addressLabel), spacer, join);
+            header.setAlignment(Pos.CENTER_LEFT);
+            box.getChildren().addAll(header, state, motd);
+            Runnable refresh = () -> {
+                state.setText("Pinging…");
+                indicator.setStyle("-fx-background-color: #64728a; -fx-background-radius: 50%;");
+                executor.execute(() -> {
+                    ServerPinger.Result result = ServerPinger.ping(server.host(), server.port());
+                    Platform.runLater(() -> {
+                        indicator.setStyle("-fx-background-color: " + (result.online() ? "#39d98a" : "#e5626f") + "; -fx-background-radius: 50%;");
+                        state.setText(result.online()
+                                ? "ONLINE  ·  " + result.players() + " / " + result.maxPlayers() + " players"
+                                + (result.latencyMs() >= 0 ? "  ·  " + result.latencyMs() + " ms" : "")
+                                + (result.version().isBlank() ? "" : "  ·  " + result.version())
+                                : "OFFLINE  ·  " + result.error());
+                        motd.setText(result.motd());
+                        motd.setVisible(!result.motd().isBlank());
+                    });
+                });
+            };
+            refreshers.add(refresh);
+            refresh.run();
+            content.getChildren().add(box);
+        }
+        setPageContent(root, content);
+        stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+    }
+
     private void showNews() {
         activePage = Page.NEWS;
         settingsPage = false;
@@ -2986,6 +3049,7 @@ public final class LauncherApp extends Application {
     private void navigate(Page page) {
         switch (page) {
             case HOME -> showHome();
+            case SERVERS -> showServers();
             case LIBRARY -> showLibrary();
             case MODS -> showMods();
             case BOOST -> showBoost();
@@ -3020,6 +3084,7 @@ public final class LauncherApp extends Application {
     private static String navigationText(Page page) {
         return switch (page) {
             case HOME -> "⌂\nHome";
+            case SERVERS -> "☰\nServers";
             case LIBRARY -> "▤\nLibrary";
             case MODS -> "✚\nMods";
             case BOOST -> "ϟ\nBoost";
@@ -3299,7 +3364,9 @@ public final class LauncherApp extends Application {
         });
     }
 
-    private void launchGame(boolean joinSmp) {
+    /** Starts the selected version; with a {@code server} it connects straight to that server. */
+    private void launchGame(ServerEntry server) {
+        boolean joinSmp = server != null;
         if (account == null) {
             showLogin();
             return;
@@ -3336,11 +3403,11 @@ public final class LauncherApp extends Application {
         if (joinSmp && launchingButton != null) {
             launchingButton.setText("CONNECTING...");
         }
-        appendLog((joinSmp ? "Preparing a local launch for neuron.zeroxhost.space:19145 with "
+        appendLog((joinSmp ? "Preparing a launch for " + server.name() + " (" + server.host() + ":" + server.port() + ") with "
                 : "Starting Minecraft from V-Client's private folder ")
                 + selected.displayName()
                 + " for " + selectedAccount.name() + " (" + selectedAccount.type().label() + ")...");
-        setPresence("Playing Minecraft", joinSmp ? "VSMP" : "");
+        setPresence("Playing Minecraft", joinSmp ? server.name() : "");
         executor.execute(() -> {
             try {
                 Consumer<String> output = line -> Platform.runLater(() -> appendLog(line));
@@ -3351,14 +3418,14 @@ public final class LauncherApp extends Application {
                                 settings.memoryGb(), selectedAccount, output);
                     } else {
                         gameLauncher.launchToServerLocally(settings.minecraftDirectory(), launchVersion,
-                                settings.memoryGb(), selectedAccount, "neuron.zeroxhost.space", 19145, output);
+                                settings.memoryGb(), selectedAccount, server.host(), server.port(), output);
                     }
                 } else if (!joinSmp) {
                     gameLauncher.launchSingleplayer(settings.minecraftDirectory(), launchVersion,
                             settings.memoryGb(), selectedAccount, output);
                 } else {
                     gameLauncher.launchToServer(settings.minecraftDirectory(), launchVersion, settings.memoryGb(),
-                            selectedAccount, "neuron.zeroxhost.space", 19145, output);
+                            selectedAccount, server.host(), server.port(), output);
                 }
             } catch (Exception e) {
                 Platform.runLater(() -> {
