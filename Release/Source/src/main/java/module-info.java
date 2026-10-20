@@ -1,6 +1,7 @@
 module com.vclient {
     requires java.desktop;
     requires java.logging;
+    requires java.naming;
     requires java.net.http;
     requires jdk.management;
     requires com.sun.jna;

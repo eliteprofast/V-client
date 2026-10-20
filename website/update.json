@@ -1,10 +1,10 @@
 {
-    "version":  "1.4.2",
+    "version":  "1.4.3",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "0f786ddc114034b2927f67a63c100029268c0a4290ef1e928344db43142eb600",
-    "size":  63099904,
-    "notes":  "V-Client sign-in is now per game account, and the admin panel only appears on the admin account.",
+    "sha256":  "6258f13ffcba462a4b493d488d2c2c2916f45cb357c55baf8dc61d3e96740552",
+    "size":  63109632,
+    "notes":  "New Servers page: live player count and ping for VSMP, LifeAMC and WSMP, with one-click JOIN.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-19T14:58:44.9925324Z"
+    "publishedAt":  "2026-10-20T15:01:49.5052771Z"
 }
