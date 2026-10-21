@@ -269,7 +269,7 @@ final class MinecraftLauncherTest {
                 .resolve("authlib-injector-1.2.8.jar");
 
         assertEquals("-javaagent:" + injector.toAbsolutePath().normalize()
-                        + "=https://authserver.ely.by",
+                        + "=https://authserver.ely.by/api/authlib-injector",
                 MinecraftLauncher.authlibInjectorArgument(injector));
     }
 
