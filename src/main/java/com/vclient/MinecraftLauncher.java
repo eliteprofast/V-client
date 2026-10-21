@@ -35,7 +35,7 @@ final class MinecraftLauncher {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final HttpClient HTTP = PlatformTls.httpClientBuilder(Duration.ofSeconds(20))
             .followRedirects(HttpClient.Redirect.NORMAL).build();
-    private static final String ELY_BY_AUTH_SERVER = "https://authserver.ely.by";
+    private static final String ELY_BY_AUTH_SERVER = "https://authserver.ely.by/api/authlib-injector";
     private static final String VERSION_MANIFEST_URL =
             "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
     private static final String LIBRARIES_URL = "https://libraries.minecraft.net/";
