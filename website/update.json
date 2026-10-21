@@ -1,10 +1,10 @@
 {
-    "version":  "1.4.4",
+    "version":  "1.4.5",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "298d03a39b3bc9db4db0aaf0b3e4dde7f086230541dad77334b1e6625b6be3a8",
+    "sha256":  "77295bc57b49fdd8a859c0fc52da238e5c3df02aaeb09c6b6a204e6a1b4d8772",
     "size":  63111680,
-    "notes":  "Fixed Ely.by accounts crashing on launch with exit code 1.",
+    "notes":  "Ely.by outages no longer stop Minecraft from starting: the game launches and tells you Ely.by login is down.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-21T11:25:03.2243443Z"
+    "publishedAt":  "2026-10-21T12:03:38.7525429Z"
 }

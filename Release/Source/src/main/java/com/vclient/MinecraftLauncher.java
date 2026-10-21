@@ -575,7 +575,17 @@ final class MinecraftLauncher {
             Path authlibInjector = offlineOnly
                     ? findCachedAuthlibInjector(minecraftDirectory, onOutput)
                     : ensureAuthlibInjector(minecraftDirectory, onOutput);
-            if (authlibInjector != null) command.add(authlibInjectorArgument(authlibInjector));
+            if (authlibInjector != null) {
+                // authlib-injector exits the JVM with code 1 when it cannot fetch the server metadata,
+                // so an Ely.by outage would otherwise stop Minecraft from starting at all.
+                String outage = elyByAuthServerOutage();
+                if (outage == null) {
+                    command.add(authlibInjectorArgument(authlibInjector));
+                } else {
+                    onOutput.accept("Ely.by authentication is unavailable (" + outage + "); launching without authlib-injector. "
+                            + "Servers that require Ely.by login will reject you until Ely.by is back.");
+                }
+            }
         }
         if (cheatPermission.test(account)) command.add("-Dvclient.cheats=true");
         if (adminPermission.test(account)) command.add("-Dvclient.cosmetics.unlockAll=true");
@@ -1407,6 +1417,21 @@ final class MinecraftLauncher {
             if (agentClass == null || agentClass.isBlank()) {
                 throw new IOException("The cached authlib-injector JAR has no Java-agent entry point.");
             }
+        }
+    }
+
+    /** Returns why Ely.by's authlib-injector metadata cannot be fetched, or null when it is reachable. */
+    private static String elyByAuthServerOutage() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(ELY_BY_AUTH_SERVER))
+                    .timeout(Duration.ofSeconds(8)).GET().build();
+            int status = HTTP.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
+            return status == 200 ? null : "HTTP " + status;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "interrupted";
+        } catch (IOException e) {
+            return e.getClass().getSimpleName();
         }
     }
 
