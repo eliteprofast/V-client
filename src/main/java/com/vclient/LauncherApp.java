@@ -410,9 +410,9 @@ public final class LauncherApp extends Application {
         Label title = label("VPN", 11, MUTED);
         Label state = label("Checking VPN...", 14, "#f3f6fc");
         Label hint = label("Built-in VPN, nothing to install and no administrator prompt. Press CONNECT and V-Client "
-                + "tunnels your game server connections (Servers page and JOIN OUR SMP) through a free Cloudflare "
-                + "WARP VPN. It keeps your connection private but does not change your country, and only Minecraft's "
-                + "server traffic is covered, not the rest of your PC. Have your own VPN? Use IMPORT CONFIG with a "
+                + "tunnels your VSMP connection (" + VSMP_HOST + ", from the Servers page or JOIN OUR SMP) through a "
+                + "free Cloudflare WARP VPN. It keeps your connection private but does not change your country, and "
+                + "only that server is covered, not the rest of your PC. Have your own VPN? Use IMPORT CONFIG with a "
                 + "WireGuard .conf instead.", 11, MUTED);
         hint.setWrapText(true);
         Button importConfig = button("IMPORT CONFIG", "#292642", 11);
@@ -451,8 +451,7 @@ public final class LauncherApp extends Application {
                 try {
                     boolean wasConnected = VpnManager.isConnected();
                     if (wasConnected) VpnManager.disconnect();
-                    else VpnManager.connect(SERVER_LIST.stream()
-                            .map(entry -> InetSocketAddress.createUnresolved(entry.host(), entry.port())).toList(),
+                    else VpnManager.connect(List.of(InetSocketAddress.createUnresolved(VSMP_HOST, VSMP_PORT)),
                             line -> Platform.runLater(() -> appendLog(line)));
                     Platform.runLater(() -> appendLog(wasConnected ? "VPN disconnected." : "VPN connected."));
                 } catch (IOException e) {
