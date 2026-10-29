@@ -1,10 +1,10 @@
 {
-    "version":  "1.5.0",
+    "version":  "1.5.1",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "01de183738d484b0f93822c025c9a92c99f9f4ba9a5ed2050f52bad3b38a9651",
-    "size":  63330816,
-    "notes":  "VPN: WireGuard\u0027s official signed installer is now bundled, so connecting no longer needs to download it.",
+    "sha256":  "cfcac87bc0cb9a163984704049a2478c9ac221ecd59bdc4a0c513a0d8ffb5e75",
+    "size":  71500800,
+    "notes":  "Built-in game VPN: no install and no admin prompt. Press CONNECT in Settings and your server joins go through a free Cloudflare VPN.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-29T16:59:33.7606514Z"
+    "publishedAt":  "2026-10-29T17:27:24.6459388Z"
 }

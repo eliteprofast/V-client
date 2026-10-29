@@ -43,6 +43,7 @@ import javafx.stage.Stage;
 import java.awt.Desktop;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -408,9 +409,10 @@ public final class LauncherApp extends Application {
         VBox card = card();
         Label title = label("VPN", 11, MUTED);
         Label state = label("Checking VPN...", 14, "#f3f6fc");
-        Label hint = label("Just press CONNECT: V-Client sets up a free Cloudflare WARP VPN for your whole PC (WireGuard "
-                + "is installed automatically too; Windows asks for administrator permission). WARP keeps your "
-                + "connection private but does not change your country. Have your own VPN? Use IMPORT CONFIG with a "
+        Label hint = label("Built-in VPN, nothing to install and no administrator prompt. Press CONNECT and V-Client "
+                + "tunnels your game server connections (Servers page and JOIN OUR SMP) through a free Cloudflare "
+                + "WARP VPN. It keeps your connection private but does not change your country, and only Minecraft's "
+                + "server traffic is covered, not the rest of your PC. Have your own VPN? Use IMPORT CONFIG with a "
                 + "WireGuard .conf instead.", 11, MUTED);
         hint.setWrapText(true);
         Button importConfig = button("IMPORT CONFIG", "#292642", 11);
@@ -448,7 +450,10 @@ public final class LauncherApp extends Application {
             executor.execute(() -> {
                 try {
                     boolean wasConnected = VpnManager.isConnected();
-                    if (wasConnected) VpnManager.disconnect(); else VpnManager.connect(line -> Platform.runLater(() -> appendLog(line)));
+                    if (wasConnected) VpnManager.disconnect();
+                    else VpnManager.connect(SERVER_LIST.stream()
+                            .map(entry -> InetSocketAddress.createUnresolved(entry.host(), entry.port())).toList(),
+                            line -> Platform.runLater(() -> appendLog(line)));
                     Platform.runLater(() -> appendLog(wasConnected ? "VPN disconnected." : "VPN connected."));
                 } catch (IOException e) {
                     Platform.runLater(() -> {
@@ -3472,6 +3477,11 @@ public final class LauncherApp extends Application {
                 + selected.displayName()
                 + " for " + selectedAccount.name() + " (" + selectedAccount.type().label() + ")...");
         setPresence("Playing Minecraft", joinSmp ? server.name() : "");
+        // With the VPN on, join through its local forwarding port instead of the server's own address.
+        Integer vpnPort = joinSmp ? VpnManager.route(server.host(), server.port()) : null;
+        String joinHost = vpnPort != null ? "127.0.0.1" : joinSmp ? server.host() : "";
+        int joinPort = vpnPort != null ? vpnPort : joinSmp ? server.port() : 0;
+        if (vpnPort != null) appendLog("VPN is on: joining " + server.name() + " through the tunnel.");
         executor.execute(() -> {
             try {
                 Consumer<String> output = line -> Platform.runLater(() -> appendLog(line));
@@ -3482,14 +3492,14 @@ public final class LauncherApp extends Application {
                                 settings.memoryGb(), selectedAccount, output);
                     } else {
                         gameLauncher.launchToServerLocally(settings.minecraftDirectory(), launchVersion,
-                                settings.memoryGb(), selectedAccount, server.host(), server.port(), output);
+                                settings.memoryGb(), selectedAccount, joinHost, joinPort, output);
                     }
                 } else if (!joinSmp) {
                     gameLauncher.launchSingleplayer(settings.minecraftDirectory(), launchVersion,
                             settings.memoryGb(), selectedAccount, output);
                 } else {
                     gameLauncher.launchToServer(settings.minecraftDirectory(), launchVersion, settings.memoryGb(),
-                            selectedAccount, server.host(), server.port(), output);
+                            selectedAccount, joinHost, joinPort, output);
                 }
             } catch (Exception e) {
                 Platform.runLater(() -> {
@@ -4299,6 +4309,7 @@ public final class LauncherApp extends Application {
     @Override
     public void stop() {
         if (backgroundAnimation != null) backgroundAnimation.stop();
+        VpnManager.disconnect();
         executor.shutdownNow();
     }
 
