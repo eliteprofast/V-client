@@ -1,10 +1,10 @@
 {
-    "version":  "1.4.7",
+    "version":  "1.4.8",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "88b20766209e9bc9520fd2df87e1b850bc386555ec52c52f32849c867a96e640",
-    "size":  63228928,
-    "notes":  "VPN: WireGuard is now installed automatically the first time you connect, so there is nothing to install by hand.",
+    "sha256":  "ab1e86c96b533708f47dd7fcbdd0ad0627fb7390aa694e4492fafda71c372584",
+    "size":  63232000,
+    "notes":  "VPN: press CONNECT and a free Cloudflare WARP VPN is set up automatically. No config or install needed.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-29T16:18:45.3523802Z"
+    "publishedAt":  "2026-10-29T16:26:57.9855584Z"
 }

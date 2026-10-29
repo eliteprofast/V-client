@@ -408,9 +408,10 @@ public final class LauncherApp extends Application {
         VBox card = card();
         Label title = label("VPN", 11, MUTED);
         Label state = label("Checking VPN...", 14, "#f3f6fc");
-        Label hint = label("Runs a real WireGuard tunnel for your whole PC, so the game connects through it. Import a "
-                + "WireGuard client config (.conf) from your VPN provider. WireGuard is installed automatically "
-                + "the first time; Windows asks for administrator permission when connecting.", 11, MUTED);
+        Label hint = label("Just press CONNECT: V-Client sets up a free Cloudflare WARP VPN for your whole PC (WireGuard "
+                + "is installed automatically too; Windows asks for administrator permission). WARP keeps your "
+                + "connection private but does not change your country. Have your own VPN? Use IMPORT CONFIG with a "
+                + "WireGuard .conf instead.", 11, MUTED);
         hint.setWrapText(true);
         Button importConfig = button("IMPORT CONFIG", "#292642", 11);
         Button toggle = button("CONNECT", ACCENT, 11);
@@ -421,9 +422,9 @@ public final class LauncherApp extends Application {
             boolean connected = VpnManager.isConnected();
             boolean configured = VpnManager.hasConfig();
             Platform.runLater(() -> {
-                state.setText(connected ? "Connected" : configured ? "Disconnected (config imported)" : "No config imported");
+                state.setText(connected ? "Connected" : configured ? "Disconnected" : "Off (free Cloudflare VPN, one click)");
                 toggle.setText(connected ? "DISCONNECT" : "CONNECT");
-                toggle.setDisable(!connected && !configured);
+                toggle.setDisable(false);
             });
         });
         importConfig.setOnAction(event -> {

@@ -1,6 +1,13 @@
 package com.vclient;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.io.IOException;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.util.Arrays;
+import java.util.Base64;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.net.URI;
@@ -32,6 +39,9 @@ final class VpnManager {
     private static final Pattern MSI_NAME = Pattern.compile("wireguard-amd64-([0-9]+(?:\\.[0-9]+)*)\\.msi");
     private static final HttpClient HTTP = PlatformTls.httpClientBuilder(Duration.ofSeconds(20))
             .followRedirects(HttpClient.Redirect.NORMAL).build();
+
+    private static final String WARP_REGISTER = "https://api.cloudflareclient.com/v0a2158/reg";
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private VpnManager() {}
 
@@ -158,8 +168,61 @@ final class VpnManager {
         return 0;
     }
 
+    /**
+     * Registers a free Cloudflare WARP device (the same thing the wgcf tool does) and stores its WireGuard config,
+     * so the VPN works without the player importing anything.
+     */
+    private static void provisionWarp(Consumer<String> log) throws IOException {
+        log.accept("No VPN config yet; creating a free Cloudflare WARP one...");
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("X25519");
+            KeyPair pair = generator.generateKeyPair();
+            byte[] privateEncoded = pair.getPrivate().getEncoded();
+            byte[] publicEncoded = pair.getPublic().getEncoded();
+            Base64.Encoder base64 = Base64.getEncoder();
+            String privateKey = base64.encodeToString(Arrays.copyOfRange(privateEncoded, privateEncoded.length - 32,
+                    privateEncoded.length));
+            String publicKey = base64.encodeToString(Arrays.copyOfRange(publicEncoded, publicEncoded.length - 32,
+                    publicEncoded.length));
+            ObjectNode body = JSON.createObjectNode();
+            body.put("key", publicKey);
+            body.put("install_id", "");
+            body.put("fcm_token", "");
+            body.put("tos", java.time.Instant.now().toString());
+            body.put("model", "PC");
+            body.put("serial_number", java.util.UUID.randomUUID().toString());
+            body.put("locale", "en_US");
+            HttpRequest request = HttpRequest.newBuilder(URI.create(WARP_REGISTER))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/json")
+                    .header("User-Agent", "okhttp/3.12.1")
+                    .header("CF-Client-Version", "a-6.3-1922")
+                    .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)))
+                    .build();
+            var root = JSON.readTree(fetch(request, HttpResponse.BodyHandlers.ofString(), log).body());
+            var config = root.path("config");
+            String peerKey = config.path("peers").path(0).path("public_key").asText("");
+            String endpoint = config.path("peers").path(0).path("endpoint").path("host").asText("");
+            String v4 = config.path("interface").path("addresses").path("v4").asText("");
+            String v6 = config.path("interface").path("addresses").path("v6").asText("");
+            if (peerKey.isBlank() || endpoint.isBlank() || v4.isBlank()) {
+                throw new IOException("Cloudflare WARP answered with an unexpected response.");
+            }
+            String text = "[Interface]\nPrivateKey = " + privateKey + "\nAddress = " + v4 + "/32"
+                    + (v6.isBlank() ? "" : ", " + v6 + "/128") + "\nDNS = 1.1.1.1\nMTU = 1280\n\n[Peer]\nPublicKey = "
+                    + peerKey + "\nAllowedIPs = 0.0.0.0/0, ::/0\nEndpoint = " + endpoint + "\n";
+            Files.createDirectories(CONFIG.getParent());
+            Files.writeString(CONFIG, text, StandardCharsets.UTF_8);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new IOException("Could not generate a VPN key: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted.", e);
+        }
+    }
+
     static void connect(Consumer<String> log) throws IOException {
-        if (!hasConfig()) throw new IOException("Import a WireGuard config first.");
+        if (!hasConfig()) provisionWarp(log);
         Path exe = wireGuardExecutable();
         if (exe == null) exe = installWireGuard(log);
         if (isConnected()) return;
