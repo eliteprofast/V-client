@@ -99,8 +99,7 @@ final class VpnManager {
         log.accept("WireGuard is missing; downloading the official installer...");
         Path msi;
         try {
-            String listing = fetch(HttpRequest.newBuilder(URI.create(DOWNLOAD_INDEX)).timeout(Duration.ofSeconds(30))
-                    .build(), HttpResponse.BodyHandlers.ofString(), log).body();
+            String listing = http("GET", DOWNLOAD_INDEX, null, NO_HEADERS, null, log);
             Matcher matcher = MSI_NAME.matcher(listing);
             String best = null;
             int[] bestVersion = null;
@@ -114,8 +113,7 @@ final class VpnManager {
             if (best == null) throw new IOException("Could not find the WireGuard installer on wireguard.com.");
             Path directory = Files.createTempDirectory("vclient-wireguard");
             msi = directory.resolve(best);
-            fetch(HttpRequest.newBuilder(URI.create(DOWNLOAD_INDEX + best)).timeout(Duration.ofMinutes(5)).build(),
-                    HttpResponse.BodyHandlers.ofFile(msi), log);
+            http("GET", DOWNLOAD_INDEX + best, null, NO_HEADERS, msi, log);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted.", e);
@@ -143,13 +141,61 @@ final class VpnManager {
         return exe;
     }
 
-    private static <T> HttpResponse<T> fetch(HttpRequest request, HttpResponse.BodyHandler<T> handler,
-                                             Consumer<String> log) throws IOException, InterruptedException {
-        HttpResponse<T> response = PlatformTls.sendWithRetries(HTTP, request, handler, log);
-        if (response.statusCode() != 200) {
-            throw new IOException("wireguard.com answered HTTP " + response.statusCode() + " for " + request.uri());
+    private static final String[] NO_HEADERS = new String[0];
+
+    /**
+     * One HTTPS request; returns the body text (or saves it to {@code outFile}). Java's TLS stack goes first; if the
+     * server refuses that handshake, Windows' own curl.exe (Schannel TLS) retries it.
+     */
+    private static String http(String method, String url, String body, String[] headers, Path outFile,
+                               Consumer<String> log) throws IOException, InterruptedException {
+        try {
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(5));
+            for (String header : headers) {
+                int colon = header.indexOf(':');
+                builder.header(header.substring(0, colon), header.substring(colon + 1).trim());
+            }
+            builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
+                    : HttpRequest.BodyPublishers.ofString(body));
+            HttpResponse<?> response = outFile == null
+                    ? PlatformTls.sendWithRetries(HTTP, builder.build(), HttpResponse.BodyHandlers.ofString(), log)
+                    : PlatformTls.sendWithRetries(HTTP, builder.build(), HttpResponse.BodyHandlers.ofFile(outFile), log);
+            if (response.statusCode() / 100 != 2) {
+                throw new IOException(URI.create(url).getHost() + " answered HTTP " + response.statusCode());
+            }
+            return outFile == null ? (String) response.body() : "";
+        } catch (IOException e) {
+            log.accept("Java's secure connection to " + URI.create(url).getHost() + " failed ("
+                    + PlatformTls.describeFailure(e) + "); retrying with Windows' own TLS (curl.exe).");
+            return curl(method, url, body, headers, outFile);
         }
-        return response;
+    }
+
+    private static String curl(String method, String url, String body, String[] headers, Path outFile)
+            throws IOException, InterruptedException {
+        java.util.List<String> command = new java.util.ArrayList<>(java.util.List.of(
+                Path.of(System.getenv().getOrDefault("WINDIR", "C:\\Windows"), "System32", "curl.exe").toString(),
+                "-sS", "-f", "-L", "--max-time", "300", "-X", method));
+        for (String header : headers) {
+            command.add("-H");
+            command.add(header);
+        }
+        if (body != null) command.addAll(java.util.List.of("--data-binary", "@-"));
+        if (outFile != null) command.addAll(java.util.List.of("-o", outFile.toString()));
+        command.add(url);
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        try (var stdin = process.getOutputStream()) {
+            if (body != null) stdin.write(body.getBytes(StandardCharsets.UTF_8));
+        }
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        if (!process.waitFor(310, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new IOException("Timed out contacting " + URI.create(url).getHost() + ".");
+        }
+        if (process.exitValue() != 0) {
+            throw new IOException("Could not reach " + URI.create(url).getHost() + ": " + output.trim());
+        }
+        return outFile == null ? output : "";
     }
 
     private static int[] parseVersion(String text) {
@@ -192,14 +238,9 @@ final class VpnManager {
             body.put("model", "PC");
             body.put("serial_number", java.util.UUID.randomUUID().toString());
             body.put("locale", "en_US");
-            HttpRequest request = HttpRequest.newBuilder(URI.create(WARP_REGISTER))
-                    .timeout(Duration.ofSeconds(30))
-                    .header("Content-Type", "application/json")
-                    .header("User-Agent", "okhttp/3.12.1")
-                    .header("CF-Client-Version", "a-6.3-1922")
-                    .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)))
-                    .build();
-            var root = JSON.readTree(fetch(request, HttpResponse.BodyHandlers.ofString(), log).body());
+            var root = JSON.readTree(http("POST", WARP_REGISTER, JSON.writeValueAsString(body), new String[]{
+                    "Content-Type: application/json", "User-Agent: okhttp/3.12.1",
+                    "CF-Client-Version: a-6.3-1922"}, null, log));
             var config = root.path("config");
             String peerKey = config.path("peers").path(0).path("public_key").asText("");
             String endpoint = config.path("peers").path(0).path("endpoint").path("host").asText("");

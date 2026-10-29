@@ -1,10 +1,10 @@
 {
-    "version":  "1.4.8",
+    "version":  "1.4.9",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "ab1e86c96b533708f47dd7fcbdd0ad0627fb7390aa694e4492fafda71c372584",
-    "size":  63232000,
-    "notes":  "VPN: press CONNECT and a free Cloudflare WARP VPN is set up automatically. No config or install needed.",
+    "sha256":  "472144b95fe3c720926e3598c1472623bc0533fb0031bb5cb941b1532cf51209",
+    "size":  63233536,
+    "notes":  "VPN fix: falls back to Windows\u0027 own secure connection when Cloudflare or WireGuard reject the launcher\u0027s handshake.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-29T16:26:57.9855584Z"
+    "publishedAt":  "2026-10-29T16:41:35.9171556Z"
 }
