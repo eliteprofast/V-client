@@ -1,10 +1,10 @@
 {
-    "version":  "1.4.5",
+    "version":  "1.4.6",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "77295bc57b49fdd8a859c0fc52da238e5c3df02aaeb09c6b6a204e6a1b4d8772",
-    "size":  63111680,
-    "notes":  "Ely.by outages no longer stop Minecraft from starting: the game launches and tells you Ely.by login is down.",
+    "sha256":  "21b68a303745633f3198475377bc0932ebc7a448e10f1d993fb3114501b36680",
+    "size":  63224320,
+    "notes":  "New VPN card in Settings: import a WireGuard config and connect a system-wide VPN. VSMP server address updated.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-21T12:03:38.7525429Z"
+    "publishedAt":  "2026-10-29T15:51:52.9584409Z"
 }
