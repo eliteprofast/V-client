@@ -37,6 +37,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.shape.Circle;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import java.awt.Desktop;
@@ -70,7 +71,7 @@ public final class LauncherApp extends Application {
     private record ServerEntry(String name, String host, int port) {}
 
     // VSMP's address: change it here when it moves (JOIN OUR SMP and the Servers page both use it).
-    private static final String VSMP_HOST = "neuron.zeroxhost.space";
+    private static final String VSMP_HOST = "vsmp.halix.cloud";
     private static final int VSMP_PORT = 19145;
     private static final List<ServerEntry> SERVER_LIST = List.of(
             new ServerEntry("VSMP", VSMP_HOST, VSMP_PORT),
@@ -394,12 +395,74 @@ public final class LauncherApp extends Application {
         backButton.setOnAction(event -> showHome());
         status = label("Settings save automatically.", 12, MUTED);
         footer.getChildren().addAll(backButton, status);
-        content.getChildren().addAll(title, subtitle, directoryCard, memoryCard, javaCard, accountCard);
+        content.getChildren().addAll(title, subtitle, directoryCard, memoryCard, javaCard, buildVpnCard(), accountCard);
         // Hacker / Cheater mode is for the admin account only, so nobody else even sees the option.
         if (settings.isAdmin(account)) content.getChildren().add(playerModeCard);
         content.getChildren().add(footer);
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+    }
+
+    /** Imports a WireGuard config and connects/disconnects a system-wide VPN (Minecraft traffic included). */
+    private VBox buildVpnCard() {
+        VBox card = card();
+        Label title = label("VPN", 11, MUTED);
+        Label state = label("Checking VPN...", 14, "#f3f6fc");
+        Label hint = label("Runs a real WireGuard tunnel for your whole PC, so the game connects through it. Needs "
+                + "WireGuard installed and a client config (.conf) from your VPN provider; Windows asks for "
+                + "administrator permission when connecting.", 11, MUTED);
+        hint.setWrapText(true);
+        Button importConfig = button("IMPORT CONFIG", "#292642", 11);
+        Button toggle = button("CONNECT", ACCENT, 11);
+        HBox row = new HBox(10, importConfig, toggle);
+        row.setAlignment(Pos.CENTER_LEFT);
+        AtomicBoolean busy = new AtomicBoolean();
+        Runnable refresh = () -> executor.execute(() -> {
+            boolean connected = VpnManager.isConnected();
+            boolean configured = VpnManager.hasConfig();
+            Platform.runLater(() -> {
+                state.setText(connected ? "Connected" : configured ? "Disconnected (config imported)" : "No config imported");
+                toggle.setText(connected ? "DISCONNECT" : "CONNECT");
+                toggle.setDisable(!connected && !configured);
+            });
+        });
+        importConfig.setOnAction(event -> {
+            FileChooser chooser = new FileChooser();
+            chooser.setTitle("Choose WireGuard config");
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("WireGuard config", "*.conf"));
+            var selected = chooser.showOpenDialog(stage);
+            if (selected == null) return;
+            try {
+                VpnManager.importConfig(selected.toPath());
+                appendLog("VPN config imported.");
+            } catch (IOException e) {
+                showError("Could not import VPN config", e);
+            }
+            refresh.run();
+        });
+        toggle.setOnAction(event -> {
+            if (!busy.compareAndSet(false, true)) return;
+            toggle.setDisable(true);
+            state.setText("Waiting for Windows...");
+            executor.execute(() -> {
+                try {
+                    boolean wasConnected = VpnManager.isConnected();
+                    if (wasConnected) VpnManager.disconnect(); else VpnManager.connect();
+                    Platform.runLater(() -> appendLog(wasConnected ? "VPN disconnected." : "VPN connected."));
+                } catch (IOException e) {
+                    Platform.runLater(() -> {
+                        appendLog("VPN error: " + e.getMessage());
+                        showError("VPN", e);
+                    });
+                } finally {
+                    busy.set(false);
+                    refresh.run();
+                }
+            });
+        });
+        card.getChildren().addAll(title, state, row, hint);
+        refresh.run();
+        return card;
     }
 
     /** Normal player / Hacker-Cheater choice for the selected account; cheats also need an admin account. */
