@@ -408,9 +408,9 @@ public final class LauncherApp extends Application {
         VBox card = card();
         Label title = label("VPN", 11, MUTED);
         Label state = label("Checking VPN...", 14, "#f3f6fc");
-        Label hint = label("Runs a real WireGuard tunnel for your whole PC, so the game connects through it. Needs "
-                + "WireGuard installed and a client config (.conf) from your VPN provider; Windows asks for "
-                + "administrator permission when connecting.", 11, MUTED);
+        Label hint = label("Runs a real WireGuard tunnel for your whole PC, so the game connects through it. Import a "
+                + "WireGuard client config (.conf) from your VPN provider. WireGuard is installed automatically "
+                + "the first time; Windows asks for administrator permission when connecting.", 11, MUTED);
         hint.setWrapText(true);
         Button importConfig = button("IMPORT CONFIG", "#292642", 11);
         Button toggle = button("CONNECT", ACCENT, 11);
@@ -447,7 +447,7 @@ public final class LauncherApp extends Application {
             executor.execute(() -> {
                 try {
                     boolean wasConnected = VpnManager.isConnected();
-                    if (wasConnected) VpnManager.disconnect(); else VpnManager.connect();
+                    if (wasConnected) VpnManager.disconnect(); else VpnManager.connect(line -> Platform.runLater(() -> appendLog(line)));
                     Platform.runLater(() -> appendLog(wasConnected ? "VPN disconnected." : "VPN connected."));
                 } catch (IOException e) {
                     Platform.runLater(() -> {

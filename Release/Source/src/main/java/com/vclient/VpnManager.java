@@ -3,9 +3,17 @@ package com.vclient;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Runs a real VPN by driving WireGuard's Windows tunnel service with a config the player imports (from their VPN
@@ -19,6 +27,11 @@ final class VpnManager {
     private static final Path CONFIG = Path.of(
             System.getenv().getOrDefault("APPDATA", System.getProperty("user.home")),
             "V-Client", "vpn", TUNNEL + ".conf");
+
+    private static final String DOWNLOAD_INDEX = "https://download.wireguard.com/windows-client/";
+    private static final Pattern MSI_NAME = Pattern.compile("wireguard-amd64-([0-9]+(?:\\.[0-9]+)*)\\.msi");
+    private static final HttpClient HTTP = PlatformTls.httpClientBuilder(Duration.ofSeconds(20))
+            .followRedirects(HttpClient.Redirect.NORMAL).build();
 
     private VpnManager() {}
 
@@ -68,13 +81,87 @@ final class VpnManager {
         }
     }
 
-    static void connect() throws IOException {
-        Path exe = wireGuardExecutable();
-        if (exe == null) {
-            throw new IOException("WireGuard is not installed. Install it from https://www.wireguard.com/install/ "
-                    + "and try again.");
+    /**
+     * Downloads the latest official WireGuard installer, checks it carries a valid WireGuard LLC signature, and
+     * installs it silently (one UAC prompt).
+     */
+    private static Path installWireGuard(Consumer<String> log) throws IOException {
+        log.accept("WireGuard is missing; downloading the official installer...");
+        Path msi;
+        try {
+            String listing = fetch(HttpRequest.newBuilder(URI.create(DOWNLOAD_INDEX)).timeout(Duration.ofSeconds(30))
+                    .build(), HttpResponse.BodyHandlers.ofString(), log).body();
+            Matcher matcher = MSI_NAME.matcher(listing);
+            String best = null;
+            int[] bestVersion = null;
+            while (matcher.find()) {
+                int[] version = parseVersion(matcher.group(1));
+                if (bestVersion == null || compareVersions(version, bestVersion) > 0) {
+                    best = matcher.group();
+                    bestVersion = version;
+                }
+            }
+            if (best == null) throw new IOException("Could not find the WireGuard installer on wireguard.com.");
+            Path directory = Files.createTempDirectory("vclient-wireguard");
+            msi = directory.resolve(best);
+            fetch(HttpRequest.newBuilder(URI.create(DOWNLOAD_INDEX + best)).timeout(Duration.ofMinutes(5)).build(),
+                    HttpResponse.BodyHandlers.ofFile(msi), log);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted.", e);
         }
+        try {
+            Process check = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                    "$s = Get-AuthenticodeSignature -LiteralPath '" + msi.toString().replace("'", "''") + "';"
+                            + " if ($s.Status -eq 'Valid' -and $s.SignerCertificate.Subject -match 'WireGuard LLC')"
+                            + " { exit 0 } else { exit 1 }")
+                    .redirectErrorStream(true).start();
+            check.getInputStream().readAllBytes();
+            if (!check.waitFor(60, TimeUnit.SECONDS) || check.exitValue() != 0) {
+                throw new IOException("The downloaded WireGuard installer is not signed by WireGuard LLC; "
+                        + "refusing to run it.");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted.", e);
+        }
+        log.accept("Installing WireGuard (Windows will ask for administrator permission)...");
+        runElevated(Path.of(System.getenv().getOrDefault("WINDIR", "C:\\Windows"), "System32", "msiexec.exe"),
+                "/i \"" + msi + "\" /qn /norestart");
+        Path exe = wireGuardExecutable();
+        if (exe == null) throw new IOException("WireGuard did not install.");
+        return exe;
+    }
+
+    private static <T> HttpResponse<T> fetch(HttpRequest request, HttpResponse.BodyHandler<T> handler,
+                                             Consumer<String> log) throws IOException, InterruptedException {
+        HttpResponse<T> response = PlatformTls.sendWithRetries(HTTP, request, handler, log);
+        if (response.statusCode() != 200) {
+            throw new IOException("wireguard.com answered HTTP " + response.statusCode() + " for " + request.uri());
+        }
+        return response;
+    }
+
+    private static int[] parseVersion(String text) {
+        String[] parts = text.split("\\.");
+        int[] result = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) result[i] = Integer.parseInt(parts[i]);
+        return result;
+    }
+
+    private static int compareVersions(int[] a, int[] b) {
+        for (int i = 0; i < Math.max(a.length, b.length); i++) {
+            int x = i < a.length ? a[i] : 0;
+            int y = i < b.length ? b[i] : 0;
+            if (x != y) return Integer.compare(x, y);
+        }
+        return 0;
+    }
+
+    static void connect(Consumer<String> log) throws IOException {
         if (!hasConfig()) throw new IOException("Import a WireGuard config first.");
+        Path exe = wireGuardExecutable();
+        if (exe == null) exe = installWireGuard(log);
         if (isConnected()) return;
         runElevated(exe, "/installtunnelservice \"" + CONFIG + "\"");
         for (int attempt = 0; attempt < 20; attempt++) {

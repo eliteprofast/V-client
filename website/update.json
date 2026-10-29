@@ -1,10 +1,10 @@
 {
-    "version":  "1.4.6",
+    "version":  "1.4.7",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "21b68a303745633f3198475377bc0932ebc7a448e10f1d993fb3114501b36680",
-    "size":  63224320,
-    "notes":  "New VPN card in Settings: import a WireGuard config and connect a system-wide VPN. VSMP server address updated.",
+    "sha256":  "88b20766209e9bc9520fd2df87e1b850bc386555ec52c52f32849c867a96e640",
+    "size":  63228928,
+    "notes":  "VPN: WireGuard is now installed automatically the first time you connect, so there is nothing to install by hand.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-29T15:51:52.9584409Z"
+    "publishedAt":  "2026-10-29T16:18:45.3523802Z"
 }
