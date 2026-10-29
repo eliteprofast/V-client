@@ -96,7 +96,15 @@ final class VpnManager {
      * installs it silently (one UAC prompt).
      */
     private static Path installWireGuard(Consumer<String> log) throws IOException {
-        log.accept("WireGuard is missing; downloading the official installer...");
+        log.accept("WireGuard is missing; running the bundled official WireGuard installer...");
+        try {
+            runBundledInstaller();
+            Path installed = wireGuardExecutable();
+            if (installed != null) return installed;
+            log.accept("The bundled installer did not finish installing WireGuard; trying a direct download.");
+        } catch (IOException e) {
+            log.accept("Bundled WireGuard installer failed (" + e.getMessage() + "); trying a direct download.");
+        }
         Path msi;
         try {
             String listing = http("GET", DOWNLOAD_INDEX, null, NO_HEADERS, null, log);
@@ -139,6 +147,39 @@ final class VpnManager {
         Path exe = wireGuardExecutable();
         if (exe == null) throw new IOException("WireGuard did not install.");
         return exe;
+    }
+
+    /**
+     * Runs WireGuard's own signed web installer (shipped inside V-Client) with administrator rights and waits for it
+     * to put wireguard.exe in place. It is only run if its signature is a valid WireGuard LLC one.
+     */
+    private static void runBundledInstaller() throws IOException {
+        Path installer = Files.createTempDirectory("vclient-wireguard").resolve("wireguard-installer.exe");
+        try (var in = VpnManager.class.getResourceAsStream("/wireguard-installer.exe")) {
+            if (in == null) throw new IOException("the installer is not bundled in this build");
+            Files.copy(in, installer);
+        }
+        try {
+            Process check = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                    "$s = Get-AuthenticodeSignature -LiteralPath '" + installer.toString().replace("'", "''") + "';"
+                            + " if ($s.Status -eq 'Valid' -and $s.SignerCertificate.Subject -match 'WireGuard LLC')"
+                            + " { exit 0 } else { exit 1 }")
+                    .redirectErrorStream(true).start();
+            check.getInputStream().readAllBytes();
+            if (!check.waitFor(60, TimeUnit.SECONDS) || check.exitValue() != 0) {
+                throw new IOException("the bundled installer's WireGuard LLC signature is not valid");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted.", e);
+        }
+        try {
+            runElevated(installer, "");
+        } catch (IOException e) {
+            // The installer's own exit code is not reliable; what matters is whether WireGuard ended up installed.
+            if (wireGuardExecutable() == null) throw e;
+        }
+        for (int attempt = 0; attempt < 20 && wireGuardExecutable() == null; attempt++) sleep(500);
     }
 
     private static final String[] NO_HEADERS = new String[0];
@@ -288,8 +329,9 @@ final class VpnManager {
 
     private static void runElevated(Path exe, String arguments) throws IOException {
         String script = "$p = Start-Process -FilePath '" + exe.toString().replace("'", "''")
-                + "' -ArgumentList '" + arguments.replace("'", "''") + "' -Verb RunAs -Wait -PassThru -WindowStyle Hidden;"
-                + " exit $p.ExitCode";
+                + "'" + (arguments.isEmpty() ? " -WindowStyle Normal"
+                        : " -ArgumentList '" + arguments.replace("'", "''") + "' -WindowStyle Hidden")
+                + " -Verb RunAs -Wait -PassThru; exit $p.ExitCode";
         Process process = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive",
                 "-ExecutionPolicy", "Bypass", "-Command", script).redirectErrorStream(true).start();
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
