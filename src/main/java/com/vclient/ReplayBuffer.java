@@ -34,10 +34,10 @@ import java.util.function.Supplier;
  */
 final class ReplayBuffer implements GameSession.Listener {
     static final int SECONDS = 30;
-    private static final int FRAMES_PER_SECOND = 20;
-    private static final int MAX_WIDTH = 1280;
+    private static final int FRAMES_PER_SECOND = 24;
+    private static final int MAX_WIDTH = 1920;
     private static final long MAX_BYTES = 160L * 1024 * 1024;
-    private static final float JPEG_QUALITY = 0.62f;
+    private static final float JPEG_QUALITY = 0.82f;
 
     private record Frame(long timeMillis, byte[] jpeg) {}
 
@@ -56,6 +56,7 @@ final class ReplayBuffer implements GameSession.Listener {
     });
     private final java.util.concurrent.ExecutorService workers = Executors.newFixedThreadPool(3, runnable -> {
         Thread thread = new Thread(runnable, "vclient-replay-encoder");
+        thread.setPriority(Thread.MIN_PRIORITY);
         thread.setDaemon(true);
         return thread;
     });
@@ -92,7 +93,7 @@ final class ReplayBuffer implements GameSession.Listener {
             frames.clear();
             bufferedBytes = 0;
         }
-        tasks.add(scheduler.scheduleWithFixedDelay(this::captureFrame, 500, 5,
+        tasks.add(scheduler.scheduleAtFixedRate(this::captureFrame, 500, 1000 / FRAMES_PER_SECOND,
                 TimeUnit.MILLISECONDS));
         tasks.add(scheduler.scheduleWithFixedDelay(this::pollHotkey, 500, 40, TimeUnit.MILLISECONDS));
         tasks.add(scheduler.scheduleWithFixedDelay(this::writeState, 500, 500, TimeUnit.MILLISECONDS));
@@ -150,7 +151,7 @@ final class ReplayBuffer implements GameSession.Listener {
             BufferedImage shot = robot.createScreenCapture(bounds);
             long taken = System.currentTimeMillis();
             capturing = true;
-            if (inFlight.get() >= 4) return;
+            if (inFlight.get() >= 6) return;
             inFlight.incrementAndGet();
             workers.execute(() -> {
                 try {
@@ -171,11 +172,14 @@ final class ReplayBuffer implements GameSession.Listener {
         double scale = Math.min(1.0, (double) MAX_WIDTH / shot.getWidth());
         int targetWidth = Math.max(2, ((int) Math.round(shot.getWidth() * scale)) & ~1);
         int targetHeight = Math.max(2, ((int) Math.round(shot.getHeight() * scale)) & ~1);
-        BufferedImage scaled = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
-        Graphics2D graphics = scaled.createGraphics();
-        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        graphics.drawImage(shot, 0, 0, targetWidth, targetHeight, null);
-        graphics.dispose();
+        BufferedImage scaled = shot;
+        if (targetWidth != shot.getWidth() || targetHeight != shot.getHeight()) {
+            scaled = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = scaled.createGraphics();
+            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            graphics.drawImage(shot, 0, 0, targetWidth, targetHeight, null);
+            graphics.dispose();
+        }
         byte[] jpeg = encode(scaled);
         synchronized (frames) {
             if (tasks.isEmpty()) return;

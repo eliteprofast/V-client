@@ -1,10 +1,10 @@
 {
-    "version":  "1.6.3",
+    "version":  "1.6.4",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "c9cd3b9f22a563e2842982373a2e348ea913866bef4bc550d21cec31962b9b9d",
+    "sha256":  "77a581018fa9e2e0c960fdf18c84eb9b262edc704137f3d4784d2f6470daed35",
     "size":  72793088,
-    "notes":  "Recording: smoother clips (about twice the frame rate), works in fullscreen, REC marker in game.",
+    "notes":  "Recording: sharper clips at full 1080p, lighter on the game, REC marker in game.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-30T12:43:46.8340839Z"
+    "publishedAt":  "2026-10-30T15:43:27.2544480Z"
 }
