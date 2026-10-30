@@ -31,9 +31,14 @@ final class ServerPinger {
 
     /** Never throws: an unreachable server comes back as an offline result with a short reason. */
     static Result ping(String host, int port) {
-        Target target = resolve(host, port);
+        return ping(host, port, true);
+    }
+
+    /** {@code bypassDns} false skips the DNS-filter workaround, for local addresses such as the VPN forwarding port. */
+    static Result ping(String host, int port, boolean bypassDns) {
+        Target target = bypassDns ? resolve(host, port) : new Target(host, port);
         try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(DnsBlock.bypass(target.host()), target.port()), TIMEOUT_MS);
+            socket.connect(new InetSocketAddress(bypassDns ? DnsBlock.bypass(target.host()) : target.host(), target.port()), TIMEOUT_MS);
             socket.setSoTimeout(TIMEOUT_MS);
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
             DataInputStream in = new DataInputStream(socket.getInputStream());

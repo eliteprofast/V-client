@@ -1,10 +1,10 @@
 {
-    "version":  "1.6.0",
+    "version":  "1.6.1",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "a864715735c07d49972f66dc01544f53c9b3af567cb9fc03ecffc7ae407bf56a",
-    "size":  72787968,
-    "notes":  "New tabs: Recordings (auto-import, in-app player, F8 saves the last 30 seconds), Screenshots, Mod Packs, FPS history and PC analysis, Profile (badges, achievements, daily streak, Spotify), VSMP Hub, Assistant, Cleanup and Backup. Skin studio, color themes and an in-game FPS recorder.",
+    "sha256":  "5e336213c53096d3ec94d35f81381e5c0f9d7a8d9a14838b7d5b39453dea517a",
+    "size":  72788480,
+    "notes":  "Fix joining VSMP with \u0027Connection timed out\u0027: if the VPN tunnel is on but the network blocks it, the launcher now notices and joins the server directly instead.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-30T09:42:17.9149711Z"
+    "publishedAt":  "2026-10-30T10:18:56.9576127Z"
 }

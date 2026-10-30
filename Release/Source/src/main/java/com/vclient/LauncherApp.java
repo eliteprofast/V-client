@@ -3621,13 +3621,24 @@ public final class LauncherApp extends Application {
         // With the VPN on, join through its local forwarding port instead of the server's own address.
         Integer vpnPort = joinSmp ? VpnManager.route(server.host(), server.port()) : null;
         String vpnHost = vpnPort != null ? "127.0.0.1" : joinSmp ? server.host() : "";
-        int joinPort = vpnPort != null ? vpnPort : joinSmp ? server.port() : 0;
+        int vpnJoinPort = vpnPort != null ? vpnPort : joinSmp ? server.port() : 0;
         if (vpnPort != null) appendLog("VPN is on: joining " + server.name() + " through the tunnel.");
         executor.execute(() -> {
             try {
                 Consumer<String> output = line -> Platform.runLater(() -> appendLog(line));
                 String joinHost = vpnHost;
-                if (joinSmp && vpnPort == null) {
+                int joinPort = vpnJoinPort;
+                boolean viaVpn = vpnPort != null;
+                if (viaVpn && !ServerPinger.ping("127.0.0.1", vpnPort, false).online()) {
+                    // The tunnel is up as a process but never completed its handshake (the network blocks it), so
+                    // joining through it would just time out. Join directly instead.
+                    output.accept("The VPN tunnel is not carrying traffic (the network is probably blocking it); joining "
+                            + server.name() + " directly instead. Turn the VPN off in Settings if this keeps happening.");
+                    viaVpn = false;
+                    joinHost = server.host();
+                    joinPort = server.port();
+                }
+                if (joinSmp && !viaVpn) {
                     // A DNS filter that wrongly blocks the server's name gets bypassed by joining on its real address.
                     joinHost = DnsBlock.bypass(server.host());
                     if (!joinHost.equals(server.host())) {
