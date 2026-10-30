@@ -1,6 +1,7 @@
 {
   "pack": {
     "pack_format": 46,
+    "supported_formats": { "min_inclusive": 46, "max_inclusive": 75 },
     "description": "Ultra Smooth PvP\nLow fire, clear glass, clean crosshair, soft clouds"
   }
 }

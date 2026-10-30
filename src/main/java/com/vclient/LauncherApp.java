@@ -3339,6 +3339,12 @@ public final class LauncherApp extends Application {
                 } catch (IOException e) {
                     Platform.runLater(() -> appendLog("Could not install the V-Client mod profile: " + e.getMessage()));
                 }
+                try {
+                    BundledResourcePack.ensureInstalled(directory,
+                            line -> Platform.runLater(() -> appendLog(line)));
+                } catch (IOException e) {
+                    Platform.runLater(() -> appendLog("Could not install the bundled resource pack: " + e.getMessage()));
+                }
                 versions = gameLauncher.findVersions(directory);
             } catch (Exception e) {
                 Platform.runLater(() -> {

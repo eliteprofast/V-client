@@ -681,8 +681,12 @@ def make_shader_pack():
 # ===========================================================================
 # pack.mcmeta + pack.png (128x128)
 # ===========================================================================
-def pack_mcmeta(description):
-    return '{\n  "pack": {\n    "pack_format": %d,\n    "description": "%s"\n  }\n}\n' % (PACK_FORMAT, description)
+def pack_mcmeta(description, max_format=None):
+    """max_format adds a supported_formats range so one zip also loads on newer versions without a warning."""
+    supported = ""
+    if max_format:
+        supported = '    "supported_formats": { "min_inclusive": %d, "max_inclusive": %d },\n' % (PACK_FORMAT, max_format)
+    return '{\n  "pack": {\n    "pack_format": %d,\n%s    "description": "%s"\n  }\n}\n' % (PACK_FORMAT, supported, description)
 
 
 def make_icon(sword=True):
@@ -726,7 +730,8 @@ def zip_pack(folder, zip_path):
 def main():
     for d in (MAIN, SHADERS):
         shutil.rmtree(d, ignore_errors=True)
-    write_text(MAIN, "pack.mcmeta", pack_mcmeta("Ultra Smooth PvP\\nLow fire, clear glass, clean crosshair, soft clouds"))
+    # 46 = 1.21.4, 75 = 1.21.11 (checked: every texture path in this pack exists in both versions)
+    write_text(MAIN, "pack.mcmeta", pack_mcmeta("Ultra Smooth PvP\\nLow fire, clear glass, clean crosshair, soft clouds", max_format=75))
     make_icon().save(_path(MAIN, "pack.png"))
     make_low_fire()
     make_shield_models()
