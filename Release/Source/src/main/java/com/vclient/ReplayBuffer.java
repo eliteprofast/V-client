@@ -34,7 +34,7 @@ import java.util.function.Supplier;
  */
 final class ReplayBuffer implements GameSession.Listener {
     static final int SECONDS = 30;
-    private static final int FRAMES_PER_SECOND = 15;
+    private static final int FRAMES_PER_SECOND = 20;
     private static final int MAX_WIDTH = 1280;
     private static final long MAX_BYTES = 160L * 1024 * 1024;
     private static final float JPEG_QUALITY = 0.62f;
@@ -54,6 +54,12 @@ final class ReplayBuffer implements GameSession.Listener {
         thread.setDaemon(true);
         return thread;
     });
+    private final java.util.concurrent.ExecutorService workers = Executors.newFixedThreadPool(3, runnable -> {
+        Thread thread = new Thread(runnable, "vclient-replay-encoder");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final java.util.concurrent.atomic.AtomicInteger inFlight = new java.util.concurrent.atomic.AtomicInteger();
     private final java.util.List<java.util.concurrent.ScheduledFuture<?>> tasks = new ArrayList<>();
     private Robot robot;
     private long bufferedBytes;
@@ -86,7 +92,7 @@ final class ReplayBuffer implements GameSession.Listener {
             frames.clear();
             bufferedBytes = 0;
         }
-        tasks.add(scheduler.scheduleWithFixedDelay(this::captureFrame, 500, 1000 / FRAMES_PER_SECOND,
+        tasks.add(scheduler.scheduleWithFixedDelay(this::captureFrame, 500, 5,
                 TimeUnit.MILLISECONDS));
         tasks.add(scheduler.scheduleWithFixedDelay(this::pollHotkey, 500, 40, TimeUnit.MILLISECONDS));
         tasks.add(scheduler.scheduleWithFixedDelay(this::writeState, 500, 500, TimeUnit.MILLISECONDS));
@@ -142,33 +148,49 @@ final class ReplayBuffer implements GameSession.Listener {
                 return;
             }
             BufferedImage shot = robot.createScreenCapture(bounds);
-            double scale = Math.min(1.0, (double) MAX_WIDTH / shot.getWidth());
-            int targetWidth = Math.max(2, ((int) Math.round(shot.getWidth() * scale)) & ~1);
-            int targetHeight = Math.max(2, ((int) Math.round(shot.getHeight() * scale)) & ~1);
-            BufferedImage scaled = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
-            Graphics2D graphics = scaled.createGraphics();
-            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            graphics.drawImage(shot, 0, 0, targetWidth, targetHeight, null);
-            graphics.dispose();
-            byte[] jpeg = encode(scaled);
-            long now = System.currentTimeMillis();
-            synchronized (frames) {
-                if (targetWidth != width || targetHeight != height) {
-                    frames.clear();
-                    bufferedBytes = 0;
-                    width = targetWidth;
-                    height = targetHeight;
-                }
-                frames.addLast(new Frame(now, jpeg));
-                bufferedBytes += jpeg.length;
-                while (!frames.isEmpty() && (now - frames.peekFirst().timeMillis() > SECONDS * 1000L
-                        || bufferedBytes > MAX_BYTES)) {
-                    bufferedBytes -= frames.removeFirst().jpeg().length;
-                }
-            }
+            long taken = System.currentTimeMillis();
             capturing = true;
+            if (inFlight.get() >= 4) return;
+            inFlight.incrementAndGet();
+            workers.execute(() -> {
+                try {
+                    store(shot, taken);
+                } catch (Throwable e) {
+                    // Drop this frame.
+                } finally {
+                    inFlight.decrementAndGet();
+                }
+            });
         } catch (Throwable e) {
             capturing = false;
+        }
+    }
+
+    /** Scales and encodes one captured frame on a worker thread, so capturing is not slowed by encoding. */
+    private void store(BufferedImage shot, long taken) throws IOException {
+        double scale = Math.min(1.0, (double) MAX_WIDTH / shot.getWidth());
+        int targetWidth = Math.max(2, ((int) Math.round(shot.getWidth() * scale)) & ~1);
+        int targetHeight = Math.max(2, ((int) Math.round(shot.getHeight() * scale)) & ~1);
+        BufferedImage scaled = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = scaled.createGraphics();
+        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        graphics.drawImage(shot, 0, 0, targetWidth, targetHeight, null);
+        graphics.dispose();
+        byte[] jpeg = encode(scaled);
+        synchronized (frames) {
+            if (tasks.isEmpty()) return;
+            if (targetWidth != width || targetHeight != height) {
+                frames.clear();
+                bufferedBytes = 0;
+                width = targetWidth;
+                height = targetHeight;
+            }
+            frames.addLast(new Frame(taken, jpeg));
+            bufferedBytes += jpeg.length;
+            while (!frames.isEmpty() && (taken - frames.peekFirst().timeMillis() > SECONDS * 1000L
+                    || bufferedBytes > MAX_BYTES)) {
+                bufferedBytes -= frames.removeFirst().jpeg().length;
+            }
         }
     }
 
@@ -223,6 +245,7 @@ final class ReplayBuffer implements GameSession.Listener {
         int clipHeight;
         synchronized (frames) {
             snapshot = new ArrayList<>(frames);
+            snapshot.sort(java.util.Comparator.comparingLong(Frame::timeMillis));
             clipWidth = width;
             clipHeight = height;
         }

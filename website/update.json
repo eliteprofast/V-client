@@ -1,10 +1,10 @@
 {
-    "version":  "1.6.2",
+    "version":  "1.6.3",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "e10f1ae58666a7aa806c1384132cb2a22e6a7a7d8460701633c9bd1a9c75292d",
-    "size":  72792064,
-    "notes":  "Recording: a REC marker now shows in game while the replay buffer records, and a Clip saved note after F8.",
+    "sha256":  "c9cd3b9f22a563e2842982373a2e348ea913866bef4bc550d21cec31962b9b9d",
+    "size":  72793088,
+    "notes":  "Recording: smoother clips (about twice the frame rate), works in fullscreen, REC marker in game.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-30T12:15:53.9917824Z"
+    "publishedAt":  "2026-10-30T12:43:46.8340839Z"
 }
