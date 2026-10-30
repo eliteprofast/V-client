@@ -46,6 +46,8 @@ final class ReplayBuffer implements GameSession.Listener {
     private final BooleanSupplier enabled;
     private final Consumer<String> status;
     private final Consumer<Path> onSaved;
+    private final Supplier<Path> stateFile;
+    private volatile long savedAtMillis;
     private final ArrayDeque<Frame> frames = new ArrayDeque<>();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2, runnable -> {
         Thread thread = new Thread(runnable, "vclient-replay-buffer");
@@ -62,12 +64,13 @@ final class ReplayBuffer implements GameSession.Listener {
     private volatile boolean saving;
 
     ReplayBuffer(Path recordingsFolder, Supplier<String> hotkeyName, BooleanSupplier enabled,
-                 Consumer<String> status, Consumer<Path> onSaved) {
+                 Consumer<String> status, Consumer<Path> onSaved, Supplier<Path> stateFile) {
         this.recordingsFolder = recordingsFolder;
         this.hotkeyName = hotkeyName;
         this.enabled = enabled;
         this.status = status;
         this.onSaved = onSaved;
+        this.stateFile = stateFile;
     }
 
     @Override
@@ -86,6 +89,7 @@ final class ReplayBuffer implements GameSession.Listener {
         tasks.add(scheduler.scheduleWithFixedDelay(this::captureFrame, 500, 1000 / FRAMES_PER_SECOND,
                 TimeUnit.MILLISECONDS));
         tasks.add(scheduler.scheduleWithFixedDelay(this::pollHotkey, 500, 40, TimeUnit.MILLISECONDS));
+        tasks.add(scheduler.scheduleWithFixedDelay(this::writeState, 500, 500, TimeUnit.MILLISECONDS));
     }
 
     @Override
@@ -93,6 +97,7 @@ final class ReplayBuffer implements GameSession.Listener {
         tasks.forEach(task -> task.cancel(false));
         tasks.clear();
         capturing = false;
+        writeState();
         synchronized (frames) {
             frames.clear();
             bufferedBytes = 0;
@@ -101,6 +106,21 @@ final class ReplayBuffer implements GameSession.Listener {
 
     boolean capturing() {
         return capturing;
+    }
+
+    /**
+     * Tells the in-game V-Client mod whether the buffer is recording, as {@code recording|savedAtMillis|timeMillis}
+     * in {@code <game>/vclient/recording.state}; the mod shows a REC marker while it is fresh.
+     */
+    private void writeState() {
+        try {
+            Path file = stateFile.get();
+            if (file == null) return;
+            java.nio.file.Files.createDirectories(file.getParent());
+            java.nio.file.Files.writeString(file, (capturing ? 1 : 0) + "|" + savedAtMillis + "|" + System.currentTimeMillis());
+        } catch (Throwable e) {
+            // The marker is optional.
+        }
     }
 
     // ---- capture ---------------------------------------------------------------------------------
@@ -220,6 +240,8 @@ final class ReplayBuffer implements GameSession.Listener {
                 java.nio.file.Files.createDirectories(recordingsFolder);
                 MjpegAvi.write(file, snapshot.stream().map(Frame::jpeg).toList(), clipWidth, clipHeight, fps);
                 status.accept("Saved the last " + Math.round(span / 1000.0) + " seconds as " + file.getFileName());
+                savedAtMillis = System.currentTimeMillis();
+                writeState();
                 onSaved.accept(file);
             } catch (IOException e) {
                 status.accept("Could not save the clip: " + e.getMessage());

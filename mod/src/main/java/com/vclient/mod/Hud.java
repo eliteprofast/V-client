@@ -48,6 +48,7 @@ public final class Hud {
         if (client.player == null || client.options.hudHidden) return;
         trackClicks(client);
         if (client.currentScreen instanceof HudEditorScreen) return;
+        RecordingMarker.render(context, client);
         for (Module module : Module.values()) {
             if (!module.hudElement() || !VConfig.enabled(module) || !visible(client, module)) continue;
             int[] bounds = bounds(client, module);
