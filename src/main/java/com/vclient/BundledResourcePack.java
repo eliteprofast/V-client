@@ -27,7 +27,18 @@ final class BundledResourcePack {
         return minecraftDirectory.resolve("vclient").resolve("pack-enabled");
     }
 
-    /** Copies the pack if it is missing or outdated, and enables it once. Returns true if anything changed. */
+    /** True for the Minecraft releases the pack was built for (resource pack formats 46..75 = 1.21.4 to 1.21.11). */
+    static boolean supports(String clientVersionId) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("1\\.21\\.(\\d+)").matcher(clientVersionId == null ? "" : clientVersionId);
+        if (!m.matches()) return false;
+        int patch = Integer.parseInt(m.group(1));
+        return patch >= 4 && patch <= 11;
+    }
+
+    /**
+     * Copies the pack into resourcepacks if it is missing or outdated, so it always shows up in the in-game
+     * Resource Packs list. Does not switch it on. Returns true if the file was written.
+     */
     static boolean ensureInstalled(Path minecraftDirectory, Consumer<String> onOutput) throws IOException {
         Path root = minecraftDirectory.toAbsolutePath().normalize();
         byte[] bundled;
@@ -49,6 +60,13 @@ final class BundledResourcePack {
             onOutput.accept("Installed the Ultra Smooth PvP resource pack into " + target.getParent() + ".");
             changed = true;
         }
+        return changed;
+    }
+
+    /** Installs the pack and, the first time only, switches it on in options.txt. Returns true if anything changed. */
+    static boolean ensureInstalledAndEnabled(Path minecraftDirectory, Consumer<String> onOutput) throws IOException {
+        boolean changed = ensureInstalled(minecraftDirectory, onOutput);
+        Path root = minecraftDirectory.toAbsolutePath().normalize();
         Path marker = markerFile(root);
         if (!Files.exists(marker)) {
             if (enable(root.resolve("options.txt"))) {
