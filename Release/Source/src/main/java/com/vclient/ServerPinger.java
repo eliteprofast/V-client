@@ -33,7 +33,7 @@ final class ServerPinger {
     static Result ping(String host, int port) {
         Target target = resolve(host, port);
         try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(target.host(), target.port()), TIMEOUT_MS);
+            socket.connect(new InetSocketAddress(DnsBlock.bypass(target.host()), target.port()), TIMEOUT_MS);
             socket.setSoTimeout(TIMEOUT_MS);
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
             DataInputStream in = new DataInputStream(socket.getInputStream());

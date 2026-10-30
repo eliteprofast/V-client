@@ -51,6 +51,27 @@ final class DnsBlock {
         }
     }
 
+    private record Bypass(String address, long checkedAt) {}
+
+    private static final java.util.Map<String, Bypass> BYPASS_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * The address to connect to for {@code host}: the host itself normally, but the real address (looked up through
+     * Cloudflare over HTTPS) when this network's DNS filter answers with a block page, so game servers the filter
+     * wrongly blocks stay reachable. Cached for five minutes.
+     */
+    static String bypass(String host) {
+        Bypass cached = BYPASS_CACHE.get(host);
+        if (cached != null && System.currentTimeMillis() - cached.checkedAt() < 5 * 60_000L) return cached.address();
+        Finding finding = inspect(host);
+        String address = host;
+        if (finding != null && !finding.realAddresses().isEmpty()) {
+            address = finding.realAddresses().split(",")[0].trim();
+        }
+        BYPASS_CACHE.put(host, new Bypass(address, System.currentTimeMillis()));
+        return address;
+    }
+
     /** What an independent resolver (Cloudflare over HTTPS) says, as proof the name is not really there. */
     private static String realAddresses(String host) {
         try {

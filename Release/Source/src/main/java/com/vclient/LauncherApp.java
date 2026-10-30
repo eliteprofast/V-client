@@ -73,7 +73,7 @@ public final class LauncherApp extends Application {
 
     // VSMP's address: change it here when it moves (JOIN OUR SMP and the Servers page both use it).
     private static final String VSMP_HOST = "vsmp.halix.cloud";
-    private static final int VSMP_PORT = 19145;
+    private static final int VSMP_PORT = 19754;
     private static final List<ServerEntry> SERVER_LIST = List.of(
             new ServerEntry("VSMP", VSMP_HOST, VSMP_PORT),
             new ServerEntry("LifeAMC", "play.lifeamc.fun", 25565),
@@ -3478,12 +3478,20 @@ public final class LauncherApp extends Application {
         setPresence("Playing Minecraft", joinSmp ? server.name() : "");
         // With the VPN on, join through its local forwarding port instead of the server's own address.
         Integer vpnPort = joinSmp ? VpnManager.route(server.host(), server.port()) : null;
-        String joinHost = vpnPort != null ? "127.0.0.1" : joinSmp ? server.host() : "";
+        String vpnHost = vpnPort != null ? "127.0.0.1" : joinSmp ? server.host() : "";
         int joinPort = vpnPort != null ? vpnPort : joinSmp ? server.port() : 0;
         if (vpnPort != null) appendLog("VPN is on: joining " + server.name() + " through the tunnel.");
         executor.execute(() -> {
             try {
                 Consumer<String> output = line -> Platform.runLater(() -> appendLog(line));
+                String joinHost = vpnHost;
+                if (joinSmp && vpnPort == null) {
+                    // A DNS filter that wrongly blocks the server's name gets bypassed by joining on its real address.
+                    joinHost = DnsBlock.bypass(server.host());
+                    if (!joinHost.equals(server.host())) {
+                        output.accept("This network's DNS blocks " + server.host() + "; joining " + joinHost + " instead.");
+                    }
+                }
                 MinecraftLauncher.InstalledVersion launchVersion = selected;
                 if (offline) {
                     if (!joinSmp) {

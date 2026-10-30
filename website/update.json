@@ -1,10 +1,10 @@
 {
-    "version":  "1.5.2",
+    "version":  "1.5.3",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "47cd315a152321d70ad1d64879dc7416efddbce6f2791d6e7b589177210ddc41",
-    "size":  71500800,
-    "notes":  "VPN now tunnels the VSMP server (vsmp.halix.cloud) only.",
+    "sha256":  "64fe04325f5b6e995cd0a1598d525779af9071c29d641a9447c08969c9e0ec2c",
+    "size":  71502336,
+    "notes":  "VSMP fix: joins and pings work on networks whose DNS filter blocks the server\u0027s name, and VSMP uses its new port.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-29T17:45:37.2186147Z"
+    "publishedAt":  "2026-10-30T07:06:30.7154678Z"
 }
