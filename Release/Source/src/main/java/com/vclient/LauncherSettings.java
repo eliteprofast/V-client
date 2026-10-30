@@ -31,6 +31,13 @@ final class LauncherSettings {
     /** VSMP Boost Mode: when on, the chosen profile's video settings, JVM flags and memory apply at every launch. */
     private boolean boostEnabled;
     private BoostProfile boostProfile = BoostProfile.BALANCED;
+    /** Keeps the last 30 seconds of the game window in memory so the clip hotkey can save them. */
+    private boolean replayBufferEnabled = true;
+    /** A {@link Theme} preset id, or "custom" to use {@link #customAccent}. */
+    private String themeId = "night";
+    private String customAccent = "#e6bd59";
+    /** Name of the key that saves the last 30 seconds (a key of {@link WinInput#HOTKEYS}). */
+    private String clipHotkey = WinInput.DEFAULT_HOTKEY;
     /**
      * The only admin: the Ely.by account Izyrn, identified by its permanent Ely.by UUID (names can change, the UUID
      * cannot). It is fixed here on purpose and is not read from settings.json, so editing that file cannot grant it.
@@ -91,6 +98,12 @@ final class LauncherSettings {
         settings.debugMode = saved.path("debugMode").asBoolean(false);
         settings.boostEnabled = saved.path("boostEnabled").asBoolean(false);
         settings.boostProfile = BoostProfile.parse(saved.path("boostProfile").asText(""), BoostProfile.BALANCED);
+        settings.replayBufferEnabled = saved.path("replayBufferEnabled").asBoolean(true);
+        settings.themeId = saved.path("themeId").asText("night");
+        String accent = saved.path("customAccent").asText("#e6bd59");
+        settings.customAccent = Theme.validHex(accent) ? accent : "#e6bd59";
+        String hotkey = saved.path("clipHotkey").asText(WinInput.DEFAULT_HOTKEY);
+        settings.clipHotkey = WinInput.HOTKEYS.containsKey(hotkey) ? hotkey : WinInput.DEFAULT_HOTKEY;
         settings.installId = saved.path("installId").asText("");
         saved.path("hackerAccountIds").forEach(id -> settings.hackerAccountIds.add(id.asText("")));
         boolean newInstallId = settings.installId.isBlank();
@@ -142,6 +155,10 @@ final class LauncherSettings {
         saved.put("debugMode", debugMode);
         saved.put("boostEnabled", boostEnabled);
         saved.put("boostProfile", boostProfile.name());
+        saved.put("replayBufferEnabled", replayBufferEnabled);
+        saved.put("themeId", themeId);
+        saved.put("customAccent", customAccent);
+        saved.put("clipHotkey", clipHotkey);
         saved.put("installId", installId);
         var hackers = saved.putArray("hackerAccountIds");
         hackerAccountIds.forEach(hackers::add);
@@ -213,6 +230,35 @@ final class LauncherSettings {
 
     void setBoostProfile(BoostProfile boostProfile) {
         this.boostProfile = boostProfile == null ? BoostProfile.BALANCED : boostProfile;
+    }
+
+    String themeId() {
+        return themeId;
+    }
+
+    String customAccent() {
+        return customAccent;
+    }
+
+    void setTheme(String themeId, String customAccent) {
+        this.themeId = themeId == null || themeId.isBlank() ? "night" : themeId;
+        if (Theme.validHex(customAccent)) this.customAccent = customAccent;
+    }
+
+    boolean replayBufferEnabled() {
+        return replayBufferEnabled;
+    }
+
+    void setReplayBufferEnabled(boolean replayBufferEnabled) {
+        this.replayBufferEnabled = replayBufferEnabled;
+    }
+
+    String clipHotkey() {
+        return clipHotkey;
+    }
+
+    void setClipHotkey(String clipHotkey) {
+        this.clipHotkey = WinInput.HOTKEYS.containsKey(clipHotkey) ? clipHotkey : WinInput.DEFAULT_HOTKEY;
     }
 
     boolean debugMode() {

@@ -7,6 +7,7 @@ module com.vclient {
     requires com.sun.jna;
     requires com.sun.jna.platform;
     requires javafx.controls;
+    requires javafx.media;
     requires com.fasterxml.jackson.databind;
 
     exports com.vclient;

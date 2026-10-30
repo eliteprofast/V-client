@@ -1,10 +1,10 @@
 {
-    "version":  "1.5.4",
+    "version":  "1.6.0",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "248e0c1546861b1b8e3e82a96a6fd2561107d1a91e001fcbb5196f4e7f9e261f",
-    "size":  71502848,
-    "notes":  "Fix the JOIN button on Minecraft 1.20+: it now joins the server through quick play instead of options the game ignores.",
+    "sha256":  "a864715735c07d49972f66dc01544f53c9b3af567cb9fc03ecffc7ae407bf56a",
+    "size":  72787968,
+    "notes":  "New tabs: Recordings (auto-import, in-app player, F8 saves the last 30 seconds), Screenshots, Mod Packs, FPS history and PC analysis, Profile (badges, achievements, daily streak, Spotify), VSMP Hub, Assistant, Cleanup and Backup. Skin studio, color themes and an in-game FPS recorder.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-30T07:13:34.0106635Z"
+    "publishedAt":  "2026-10-30T09:42:17.9149711Z"
 }

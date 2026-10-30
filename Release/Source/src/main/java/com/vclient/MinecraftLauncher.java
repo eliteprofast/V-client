@@ -666,6 +666,7 @@ final class MinecraftLauncher {
                     + selected.id() + ": " + e.getMessage(), e);
         }
         onOutput.accept("Started Minecraft process (PID " + process.pid() + ").");
+        GameSession.started(selected.id());
         onOutput.accept("Capturing Minecraft stdout/stderr and watching for a crash report.");
         Thread outputReader = new Thread(() -> {
             try (var lines = process.inputReader()) {
@@ -677,7 +678,12 @@ final class MinecraftLauncher {
         }, "vclient-game-output");
         outputReader.setDaemon(true);
         outputReader.start();
-        int exitCode = process.waitFor();
+        int exitCode;
+        try {
+            exitCode = process.waitFor();
+        } finally {
+            GameSession.ended();
+        }
         outputReader.join();
         onOutput.accept(exitCode == 0 ? "Minecraft closed." : "Minecraft exited with code " + exitCode + ".");
         if (exitCode != 0) {
