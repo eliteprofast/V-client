@@ -1,10 +1,10 @@
 {
-    "version":  "1.6.1",
+    "version":  "1.6.2",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "5e336213c53096d3ec94d35f81381e5c0f9d7a8d9a14838b7d5b39453dea517a",
-    "size":  72788480,
-    "notes":  "Fix joining VSMP with \u0027Connection timed out\u0027: if the VPN tunnel is on but the network blocks it, the launcher now notices and joins the server directly instead.",
+    "sha256":  "e10f1ae58666a7aa806c1384132cb2a22e6a7a7d8460701633c9bd1a9c75292d",
+    "size":  72792064,
+    "notes":  "Recording: a REC marker now shows in game while the replay buffer records, and a Clip saved note after F8.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-30T10:18:56.9576127Z"
+    "publishedAt":  "2026-10-30T12:15:53.9917824Z"
 }
