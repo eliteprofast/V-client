@@ -1,10 +1,10 @@
 {
-    "version":  "1.6.4",
+    "version":  "1.6.5",
     "url":  "/VSMPClientSetup.exe",
-    "sha256":  "77a581018fa9e2e0c960fdf18c84eb9b262edc704137f3d4784d2f6470daed35",
-    "size":  72793088,
-    "notes":  "Recording: sharper clips at full 1080p, lighter on the game, REC marker in game.",
+    "sha256":  "f4bcbd11f3d3b9f0e3742f96212201daca4fc28849b5fa11f0444435f16a3648",
+    "size":  72913920,
+    "notes":  "Ultra Smooth PvP resource pack is now bundled and shows up in Options \u003e Resource Packs.",
     "mandatory":  false,
     "minSupported":  "0.0.0",
-    "publishedAt":  "2026-10-30T15:43:27.2544480Z"
+    "publishedAt":  "2026-10-30T17:22:15.2924856Z"
 }

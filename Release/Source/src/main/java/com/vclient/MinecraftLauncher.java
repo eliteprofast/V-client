@@ -550,6 +550,16 @@ final class MinecraftLauncher {
         substitutions.put("launcher_version", "1.0.0");
         substitutions.put("classpath", classpathValue);
 
+        try {
+            if (BundledResourcePack.supports(resolved.clientVersionId())) {
+                BundledResourcePack.ensureInstalledAndEnabled(minecraftDirectory, onOutput);
+            } else {
+                BundledResourcePack.ensureInstalled(minecraftDirectory, onOutput);
+            }
+        } catch (IOException e) {
+            onOutput.accept("Could not install the bundled resource pack: " + e.getMessage());
+        }
+
         List<String> command = new ArrayList<>();
         onOutput.accept("Java runtime requested: " + javaMajor + "; executable: " + javaExecutable);
         command.add(javaExecutable.toString());
