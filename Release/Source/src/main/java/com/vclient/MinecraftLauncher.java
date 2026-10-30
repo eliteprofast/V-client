@@ -626,10 +626,20 @@ final class MinecraftLauncher {
             command.addAll(legacyArguments(version.path("minecraftArguments").asText(""), substitutions));
         }
         if (!serverHost.isBlank()) {
-            command.add("--server");
-            command.add(serverHost);
-            command.add("--port");
-            command.add(Integer.toString(serverPort));
+            if (version.toString().contains("quickPlayMultiplayer")) {
+                // Minecraft 1.20+ ignores --server/--port ("Completely ignored arguments"); quick play is how it joins.
+                Path quickPlayLog = minecraftDirectory.resolve("quickPlay").resolve("java").resolve("multiplayer.json");
+                Files.createDirectories(quickPlayLog.getParent());
+                command.add("--quickPlayPath");
+                command.add(quickPlayLog.toString());
+                command.add("--quickPlayMultiplayer");
+                command.add(serverHost + ":" + serverPort);
+            } else {
+                command.add("--server");
+                command.add(serverHost);
+                command.add("--port");
+                command.add(Integer.toString(serverPort));
+            }
         }
         if (command.stream().anyMatch(argument -> argument.contains("${"))) {
             throw new IOException("The selected profile uses game arguments this launcher cannot resolve. Update or reinstall its loader.");
