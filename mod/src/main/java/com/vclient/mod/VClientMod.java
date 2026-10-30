@@ -102,6 +102,7 @@ public final class VClientMod implements ClientModInitializer {
 
         com.vclient.mod.cosmetics.Cosmetics.tick(client);
         trackDeath(client);
+        FpsRecorder.tick(client);
 
         if (cheatsAllowed()) tickCheats(client);
 

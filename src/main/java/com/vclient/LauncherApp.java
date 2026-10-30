@@ -66,7 +66,8 @@ import java.util.function.Consumer;
 
 public final class LauncherApp extends Application {
     private enum Page {
-        HOME, SERVERS, LIBRARY, MODS, BOOST, WARDROBE, COSMETICS, FRIENDS, NEWS, LOGS, CONSOLE, SETTINGS, DISCORD
+        HOME, HUB, SERVERS, LIBRARY, MODS, PACKS, BOOST, PERFORMANCE, WARDROBE, COSMETICS, PROFILE, RECORDINGS,
+        SCREENSHOTS, FRIENDS, NEWS, ASSISTANT, LOGS, CONSOLE, SETTINGS, DISCORD
     }
 
     private record ServerEntry(String name, String host, int port) {}
@@ -89,9 +90,9 @@ public final class LauncherApp extends Application {
         }
     }
 
-    private static final String BACKGROUND = "#08091a";
+    private static String BACKGROUND = "#08091a";
     private static final String MUTED = "#9999bd";
-    private static final String ACCENT = "#e6bd59";
+    private static String ACCENT = "#e6bd59";
     private static final HttpClient IMAGE_HTTP = PlatformTls.httpClientBuilder(Duration.ofSeconds(12))
             .followRedirects(HttpClient.Redirect.NORMAL).build();
     private final ExecutorService executor = Executors.newCachedThreadPool(runnable -> {
@@ -117,6 +118,17 @@ public final class LauncherApp extends Application {
     private final java.util.Set<String> modsDownloading = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private String selectedVersionId = "";
     private LauncherSettings settings;
+    private PlayerStats stats;
+    private RecordingLibrary recordingLibrary;
+    private ReplayBuffer replayBuffer;
+    private FeatureHost featureHost;
+    private ActivityLog activityLog;
+
+    static void setThemeColors(String accent, String background) {
+        ACCENT = accent;
+        BACKGROUND = background;
+    }
+    private volatile String replayStatus = "";
     private PlayerAccount account;
     private Stage stage;
     private ComboBox<VersionChoice> versionPicker;
@@ -151,6 +163,7 @@ public final class LauncherApp extends Application {
                     ? 25 : requiredMajor;
             return javaRuntimeManager.resolve(selectedMajor, onOutput, allowDownloads);
         });
+        startFeatureServices();
         gameLauncher.setCheatPermission(settings::cheatsEnabled);
         gameLauncher.setAdminPermission(settings::isAdmin);
         gameLauncher.setBoostTuning(() -> settings.boostEnabled()
@@ -180,6 +193,40 @@ public final class LauncherApp extends Application {
             }
         }
         startBackendTasks();
+    }
+
+    /** Playtime, the recordings importer and the replay buffer all follow the game process. */
+    private void startFeatureServices() {
+        stats = PlayerStats.load(PlayerStats.defaultFile());
+        stats.markSeen(java.time.LocalDate.now());
+        stats.save();
+        activityLog = new ActivityLog(ActivityLog.defaultFile());
+        Theme.apply(settings.themeId(), settings.customAccent());
+        recordingLibrary = new RecordingLibrary(RecordingLibrary.defaultFolder());
+        replayBuffer = new ReplayBuffer(recordingLibrary.folder(), settings::clipHotkey,
+                settings::replayBufferEnabled, message -> replayStatus = message,
+                file -> activityLog.add("Saved clip " + file.getFileName()));
+        GameSession.addListener(replayBuffer);
+        GameSession.addListener(new RecordingWatcher(recordingLibrary, settings::minecraftDirectory,
+                file -> {
+                    appendLogLater("Imported recording " + file.getFileName());
+                    activityLog.add("Imported recording " + file.getFileName());
+                }));
+        GameSession.addListener(new GameSession.Listener() {
+            @Override
+            public void started(String versionId, long startedAtMillis) {
+                stats.recordLaunch(versionId);
+                activityLog.add("Launched Minecraft " + versionId);
+                stats.save();
+            }
+
+            @Override
+            public void ended(String versionId, long startedAtMillis, long endedAtMillis) {
+                stats.addPlaytime((endedAtMillis - startedAtMillis) / 1000);
+                activityLog.add("Played " + UiKit.playtime((endedAtMillis - startedAtMillis) / 1000) + " of " + versionId);
+                stats.save();
+            }
+        });
     }
 
     private void showHome() {
@@ -396,7 +443,7 @@ public final class LauncherApp extends Application {
         backButton.setOnAction(event -> showHome());
         status = label("Settings save automatically.", 12, MUTED);
         footer.getChildren().addAll(backButton, status);
-        content.getChildren().addAll(title, subtitle, directoryCard, memoryCard, javaCard, buildVpnCard(), accountCard);
+        content.getChildren().addAll(title, subtitle, directoryCard, memoryCard, javaCard, buildVpnCard(), ThemeCard.build(featureHost()), accountCard);
         // Hacker / Cheater mode is for the admin account only, so nobody else even sees the option.
         if (settings.isAdmin(account)) content.getChildren().add(playerModeCard);
         content.getChildren().add(footer);
@@ -625,6 +672,77 @@ public final class LauncherApp extends Application {
         });
     }
 
+    /** Shows one of the feature pages built in their own classes. */
+    private void showFeaturePage(Page page, String eyebrow, String title, String subtitle,
+                                 java.util.function.Function<FeatureHost, javafx.scene.Node> builder) {
+        activePage = page;
+        settingsPage = false;
+        updateNavigationState();
+        StackPane root = baseLayout();
+        VBox content = pageContent(eyebrow, title, subtitle);
+        content.getChildren().add(builder.apply(featureHost()));
+        setPageContent(root, content);
+        stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
+    }
+
+    private FeatureHost featureHost() {
+        if (featureHost == null) {
+            featureHost = new FeatureHost() {
+                @Override public LauncherSettings settings() { return settings; }
+                @Override public PlayerAccount account() { return account; }
+                @Override public PlayerStats stats() { return stats; }
+                @Override public RecordingLibrary recordings() { return recordingLibrary; }
+                @Override public ReplayBuffer replayBuffer() { return replayBuffer; }
+                @Override public ExecutorService executor() { return executor; }
+                @Override public String replayStatus() { return replayStatus; }
+                @Override public Stage stage() { return stage; }
+                @Override public void log(String line) { appendLogLater(line); }
+                @Override public void saveSettings() { LauncherApp.this.saveSettings(); }
+                @Override public void saveStats() { stats.save(); }
+                @Override public void showSettings() { LauncherApp.this.showSettings(); }
+                @Override public boolean shown(javafx.scene.Node page) {
+                    return page.getScene() != null && page.getScene() == stage.getScene();
+                }
+                @Override public String selectedVersionId() { return selectedVersionId; }
+                @Override public void themeChanged() { navigate(activePage); }
+                @Override public ActivityLog activity() { return activityLog; }
+                @Override public BackendClient backend() { return LauncherApp.this.backend(); }
+                @Override public void openFriends() { navigate(Page.FRIENDS); }
+                @Override public ModrinthModService modrinth() { return modrinthModService; }
+                @Override public ModrinthModService.Target fabricTarget() throws IOException {
+                    Path directory = settings.minecraftDirectory();
+                    MinecraftLauncher.InstalledVersion fabric = gameLauncher.findVersions(directory).stream()
+                            .filter(version -> "Fabric".equals(version.loader()))
+                            .sorted(java.util.Comparator.comparing((MinecraftLauncher.InstalledVersion version) ->
+                                    !version.id().equals(selectedVersionId)))
+                            .findFirst().orElse(null);
+                    if (fabric == null) {
+                        throw new IOException("No Fabric profile is installed. Install the V-Client Fabric profile on the Home page first.");
+                    }
+                    return ModrinthModService.resolveTarget(directory, fabric);
+                }
+                @Override public PlayerAccount refreshedAccount() throws Exception {
+                    PlayerAccount current = account;
+                    if (current == null) throw new IOException("No account is selected.");
+                    PlayerAccount fresh = refreshAccount(current);
+                    if (!fresh.equals(current)) Platform.runLater(() -> updateRefreshedAccount(current.id(), fresh));
+                    return fresh;
+                }
+                @Override public Image downloadImage(String address) { return LauncherApp.this.downloadImage(address); }
+                @Override public int ownedCosmeticsCount() {
+                    PlayerAccount current = account;
+                    if (current == null || current.uuid() == null || settings.offlineMode()) return -1;
+                    try {
+                        return backend().ownedCosmetics(current.uuid()).size();
+                    } catch (IOException | InterruptedException e) {
+                        return -1;
+                    }
+                }
+            };
+        }
+        return featureHost;
+    }
+
     private void showBoost() {
         activePage = Page.BOOST;
         settingsPage = false;
@@ -769,8 +887,8 @@ public final class LauncherApp extends Application {
             for (VBox card : profileCards) {
                 boolean selected = card.getUserData() == settings.boostProfile();
                 String base = "-fx-background-radius: 14; -fx-border-radius: 14; -fx-border-width: " + (selected ? "2" : "1") + ";"
-                        + " -fx-background-color: " + (selected ? "rgba(230,189,89,0.13)" : "rgba(255,255,255,0.05)") + ";"
-                        + " -fx-border-color: " + (selected ? "rgba(230,189,89,0.85)" : "rgba(255,255,255,0.10)") + ";";
+                        + " -fx-background-color: " + (selected ? Theme.accentRgba(0.13) : "rgba(255,255,255,0.05)") + ";"
+                        + " -fx-border-color: " + (selected ? Theme.accentRgba(0.85) : "rgba(255,255,255,0.10)") + ";";
                 card.setStyle(base);
                 ModsUi.hoverLift(card, base);
             }
@@ -910,6 +1028,7 @@ public final class LauncherApp extends Application {
             BoostProfile profile = settings.boostProfile();
             settings.setBoostEnabled(true);
             saveSettings();
+            if (stats.unlock(PlayerStats.FPS_BOOST)) stats.save();
             refresh();
             showStatus(ModsUi.busyLabel("Applying " + profile.label() + "..."));
             Path minecraftDirectory = settings.minecraftDirectory();
@@ -1031,7 +1150,8 @@ public final class LauncherApp extends Application {
         Button accountSettings = button("MANAGE ACCOUNTS", ACCENT, 10);
         accountSettings.setOnAction(event -> showSettings());
         content.getChildren().addAll(preview, reload, accountSettings,
-                label("Wardrobe displays the saved skin/cape image. Uploading or changing Ely.by skins must be done through Ely.by.", 11, MUTED));
+                label("Wardrobe displays the saved skin/cape image. Uploading or changing Ely.by skins must be done through Ely.by.", 11, MUTED),
+                SkinStudio.build(featureHost()));
         setPageContent(root, content);
         stage.setScene(new Scene(root, stage.getWidth(), stage.getHeight()));
         loadPreviews(account, skin, cape, description, () -> account);
@@ -1129,7 +1249,7 @@ public final class LauncherApp extends Application {
                 row.setAlignment(Pos.CENTER_LEFT);
                 row.setPadding(new Insets(12, 14, 12, 14));
                 row.setStyle("-fx-background-color: rgba(15, 16, 39, 0.84); -fx-background-radius: 10; -fx-border-radius: 10;"
-                        + " -fx-border-color: " + (isEquipped ? "rgba(230, 189, 89, 0.7)" : "rgba(170, 151, 207, 0.24)") + ";");
+                        + " -fx-border-color: " + (isEquipped ? Theme.accentRgba(0.7) : "rgba(170, 151, 207, 0.24)") + ";");
                 list.getChildren().add(row);
             }
             if (shown == 0) list.getChildren().add(label("Nothing here yet.", 12, MUTED));
@@ -2788,6 +2908,7 @@ public final class LauncherApp extends Application {
                 try {
                     Path installed = modrinthModService.install(project, minecraftDirectory,
                             message -> Platform.runLater(() -> appendLog(message)));
+                    if (stats.unlock(PlayerStats.FIRST_MOD)) stats.save();
                     Platform.runLater(() -> {
                         appendLog("Installed mod " + installed + ".");
                         showNotice(successBox(project.title() + " installed"));
@@ -3121,6 +3242,20 @@ public final class LauncherApp extends Application {
             case LIBRARY -> showLibrary();
             case MODS -> showMods();
             case BOOST -> showBoost();
+            case HUB -> showFeaturePage(Page.HUB, "Community", "VSMP Hub",
+                    "Announcements, friends, patch notes and your activity in one place.", HubPage::build);
+            case PACKS -> showFeaturePage(Page.PACKS, "One click", "Mod Packs",
+                    "PvP, FPS, SMP and Builder packs, installed in one click.", PacksPage::build);
+            case PERFORMANCE -> showFeaturePage(Page.PERFORMANCE, "Performance", "FPS & PC analysis",
+                    "How the game runs on your PC, and what to change to make it run better.", PerformancePage::build);
+            case RECORDINGS -> showFeaturePage(Page.RECORDINGS, "Capture", "Recordings",
+                    "Videos recorded while Minecraft runs are imported here automatically.", RecordingsPage::build);
+            case SCREENSHOTS -> showFeaturePage(Page.SCREENSHOTS, "Capture", "Screenshots",
+                    "Your in-game screenshots, picked up automatically.", ScreenshotsPage::build);
+            case PROFILE -> showFeaturePage(Page.PROFILE, "You", "Profile",
+                    "Your playtime, achievements, daily rewards and music.", ProfilePage::build);
+            case ASSISTANT -> showFeaturePage(Page.ASSISTANT, "Help", "VSMP Assistant",
+                    "Fix launch errors, find crashes and free up disk space.", AssistantPage::build);
             case WARDROBE -> showWardrobe();
             case COSMETICS -> showCosmetics();
             case FRIENDS -> showFriends();
@@ -3137,10 +3272,10 @@ public final class LauncherApp extends Application {
             boolean selected = page == activePage;
             boolean hovered = page == hoveredPage;
             String color = selected ? ACCENT : hovered ? "#f5f7fd" : "#a9a9cc";
-            item.setStyle("-fx-background-color: " + (selected ? "rgba(230, 189, 89, 0.17)"
+            item.setStyle("-fx-background-color: " + (selected ? Theme.accentRgba(0.17)
                     : hovered ? "rgba(255, 255, 255, 0.07)" : "transparent")
                     + "; -fx-background-radius: 14; -fx-border-radius: 14; -fx-padding: 0; -fx-cursor: hand;"
-                    + " -fx-border-color: " + (selected ? "rgba(230, 189, 89, 0.55)" : "transparent") + "; -fx-border-width: 1;");
+                    + " -fx-border-color: " + (selected ? Theme.accentRgba(0.55) : "transparent") + "; -fx-border-width: 1;");
             if (item.getGraphic() instanceof VBox stack && stack.getChildren().size() == 2) {
                 stack.getChildren().get(0).setStyle("-fx-font-size: 17px; -fx-font-family: 'Segoe UI Symbol', 'Segoe UI';"
                         + " -fx-text-fill: " + color + ";");
@@ -3156,6 +3291,13 @@ public final class LauncherApp extends Application {
             case LIBRARY -> "▤\nLibrary";
             case MODS -> "✚\nMods";
             case BOOST -> "ϟ\nBoost";
+            case HUB -> "❖\nHub";
+            case PACKS -> "▦\nPacks";
+            case PERFORMANCE -> "◔\nFPS";
+            case PROFILE -> "☺\nProfile";
+            case RECORDINGS -> "●\nClips";
+            case SCREENSHOTS -> "▣\nShots";
+            case ASSISTANT -> "?\nHelp";
             case WARDROBE -> "♧\nWardrobe";
             case COSMETICS -> "✦\nCosmetics";
             case FRIENDS -> "♟\nFriends";
@@ -4262,7 +4404,7 @@ public final class LauncherApp extends Application {
         for (int layer = 12; layer >= 1; layer--) {
             double glowRadius = moonRadius * (1.0 + layer * 0.17);
             double opacity = 0.008 + (12 - layer) * 0.003;
-            graphics.setFill(Color.rgb(115, 99, 190, opacity));
+            graphics.setFill(Color.rgb(Theme.glow()[0], Theme.glow()[1], Theme.glow()[2], opacity));
             graphics.fillOval(moonX - glowRadius, moonY - glowRadius,
                     glowRadius * 2, glowRadius * 2);
         }
@@ -4279,7 +4421,7 @@ public final class LauncherApp extends Application {
                 double distance = Math.hypot(x - moonX, y - moonY) / moonRadius;
                 if (distance < 1.18 || distance > 2.15) continue;
                 double opacity = (2.15 - distance) * 0.14;
-                graphics.setFill(Color.rgb(157, 143, 218, opacity));
+                graphics.setFill(Color.rgb(Math.min(255, Theme.glow()[0] + 42), Math.min(255, Theme.glow()[1] + 44), Math.min(255, Theme.glow()[2] + 28), opacity));
                 graphics.fillRect(x, y, Math.max(2, dotSpacing * 0.42), Math.max(2, dotSpacing * 0.42));
             }
         }

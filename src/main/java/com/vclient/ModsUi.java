@@ -31,7 +31,7 @@ import java.util.List;
  * gradient fill, a light top edge and a soft shadow over the animated night sky.
  */
 final class ModsUi {
-    static final String ACCENT = "#e6bd59";
+    static String ACCENT = "#e6bd59";
     static final String MUTED = "#a9a9cc";
     static final String TEXT = "#f5f7fd";
     static final String WARNING = "#ffb454";
@@ -73,7 +73,7 @@ final class ModsUi {
         node.setOnMouseEntered(event -> {
             down.stop();
             up.playFromStart();
-            node.setStyle(baseStyle + " -fx-border-color: rgba(230,189,89,0.55);");
+            node.setStyle(baseStyle + " -fx-border-color: " + Theme.accentRgba(0.55) + ";");
         });
         node.setOnMouseExited(event -> {
             up.stop();
