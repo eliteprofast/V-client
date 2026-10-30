@@ -205,7 +205,8 @@ public final class LauncherApp extends Application {
         recordingLibrary = new RecordingLibrary(RecordingLibrary.defaultFolder());
         replayBuffer = new ReplayBuffer(recordingLibrary.folder(), settings::clipHotkey,
                 settings::replayBufferEnabled, message -> replayStatus = message,
-                file -> activityLog.add("Saved clip " + file.getFileName()));
+                file -> activityLog.add("Saved clip " + file.getFileName()),
+                () -> settings.minecraftDirectory().resolve("vclient").resolve("recording.state"));
         GameSession.addListener(replayBuffer);
         GameSession.addListener(new RecordingWatcher(recordingLibrary, settings::minecraftDirectory,
                 file -> {
